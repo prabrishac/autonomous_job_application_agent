@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/prabrisha/agentic_ai/aiengg/capstone_project/**)",
+      "Bash(python3 -m pip install python-dotenv)",
+      "Bash(python3 -c \"from autonomous_job_application_agent.main import os; print\\('KEY loaded:', bool\\(os.environ.get\\('OPENAI_API_KEY'\\)\\)\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(uv --version)",
+      "Bash(uv run *)"
+    ]
+  }
+}
