@@ -1,50 +1,50 @@
 ## Technical Questions
 1. **Explain how you would design a scalable API that handles millions of requests per day.**
-   - **Model Answer:** To design a scalable API, I would start by ensuring the API endpoints are stateless to allow for easy scaling. I would use load balancers to distribute traffic evenly across multiple servers. Implementing caching strategies, such as using Redis, can reduce database load. I would also use asynchronous processing for time-consuming tasks and ensure the database is optimized for high read/write operations, possibly using a combination of SQL and NoSQL databases depending on the data structure.
-2. **How do you approach debugging a production incident to identify the root cause?**
-   - **Model Answer:** My approach involves first gathering as much context as possible about the incident, such as logs and metrics. I use tools like Datadog for observability to identify anomalies. I then reproduce the issue in a staging environment if possible. I systematically eliminate potential causes by checking recent changes in code or infrastructure. Once identified, I work on a fix and deploy it after thorough testing, ensuring similar incidents are prevented in the future by improving monitoring and alerting.
-3. **Describe your experience with distributed systems and how you've applied it in your previous roles.**
-   - **Model Answer:** At Acme Corp, I built a high-throughput event processing pipeline using Python and Kafka, which required a deep understanding of distributed systems. I designed the system to handle 50K events per second, ensuring data consistency and fault tolerance. I also used Kubernetes for container orchestration, which helped in managing distributed workloads efficiently.
-4. **What strategies do you use to ensure API design is clean and consistent?**
-   - **Model Answer:** I prioritize clear documentation and adhere to RESTful principles for API design. Consistency is maintained by using standard HTTP methods and status codes. I also ensure that error messages are informative and standardized. Regular code reviews and feedback sessions help in maintaining the quality and consistency of the API design.
-5. **Can you discuss a time when you improved developer experience in your previous role?**
-   - **Model Answer:** At Acme Corp, I led the redesign of our public REST API, which reduced average latency by 40%. This improvement not only enhanced the performance but also made the API more intuitive for developers. I introduced code review standards and mentored junior engineers, which fostered a culture of continuous improvement and learning, ultimately enhancing the overall developer experience.
+   - **Model Answer:** I would start by ensuring that the API is stateless, which allows for horizontal scaling. Using a load balancer to distribute requests across multiple instances would be crucial. I'd implement caching strategies to reduce the load on the database and use a robust database like PostgreSQL or DynamoDB for efficient data retrieval. Monitoring and logging with tools like Datadog would help in identifying bottlenecks and optimizing performance.
+2. **How do you approach debugging a production incident?**
+   - **Model Answer:** My approach involves first gathering as much information as possible about the incident, such as logs and metrics from tools like Datadog. I would then reproduce the issue in a controlled environment if possible. Once identified, I would focus on eliminating the root cause rather than just the symptoms, ensuring similar issues do not recur.
+3. **Describe your experience with distributed systems and the challenges you faced.**
+   - **Model Answer:** At Acme Corp, I built a high-throughput event processing pipeline using Python and Kafka, which required handling distributed data processing. Challenges included ensuring data consistency and fault tolerance, which I addressed by implementing robust error handling and retry mechanisms.
+4. **What considerations do you take into account when designing a database schema?**
+   - **Model Answer:** I focus on normalization to reduce data redundancy, indexing for query performance, and ensuring scalability. At StartupXYZ, I designed a PostgreSQL schema for subscription lifecycle management, which involved careful planning to accommodate future growth and changes in business logic.
+5. **How do you ensure a good developer experience when designing APIs?**
+   - **Model Answer:** I prioritize clear and consistent API documentation, intuitive endpoint structures, and comprehensive error messages. At Acme Corp, I led a redesign of a REST API, focusing on reducing latency and improving usability, which involved gathering feedback from developers and iterating on the design.
 ## Behavioural Questions
-1. **Tell me about a time you had to debug a complex issue under pressure.**
-   - **Situation:** At Acme Corp, we had a critical production incident where our event processing pipeline was dropping messages.
-   - **Task:** I was responsible for identifying and resolving the issue quickly to minimize downtime.
-   - **Action:** I immediately gathered logs and metrics using Datadog, identified a bottleneck in the Kafka consumer configuration, and adjusted the settings to handle higher throughput.
-   - **Result:** The issue was resolved within an hour, and I implemented additional monitoring to prevent future occurrences, reducing similar incidents by 30%.
-2. **Describe a situation where you had to work closely with a product team to ship a new feature.**
-   - **Situation:** At StartupXYZ, we needed to integrate a new billing feature with Stripe.
-   - **Task:** I collaborated with the product team to understand the requirements and technical constraints.
-   - **Action:** I designed the core billing microservice in Go, ensuring seamless integration with Stripe's API, and conducted joint testing sessions with the product team.
-   - **Result:** The feature was successfully launched on schedule, enhancing our product offering and improving customer satisfaction.
-3. **Give an example of how you contributed to a technical roadmap or architecture decision.**
-   - **Situation:** At Acme Corp, we were planning to scale our infrastructure to support a growing user base.
-   - **Task:** I was tasked with evaluating our current architecture and proposing improvements.
-   - **Action:** I recommended adopting Kubernetes for container orchestration, which allowed us to efficiently manage and scale our microservices.
-   - **Result:** This decision supported our growth, improved system reliability, and reduced deployment times.
-4. **Tell me about a time you mentored someone and what the outcome was.**
-   - **Situation:** As a senior engineer at Acme Corp, I was assigned to mentor two junior engineers.
-   - **Task:** My goal was to enhance their technical skills and integrate them into the team effectively.
-   - **Action:** I conducted regular code review sessions and introduced best practices for API design and debugging.
-   - **Result:** Both engineers showed significant improvement in their coding skills and confidence, contributing effectively to our projects.
-5. **Describe a project where you had to make a significant improvement in performance.**
-   - **Situation:** At Acme Corp, our public REST API was experiencing high latency.
-   - **Task:** I needed to optimize the API to meet performance benchmarks.
-   - **Action:** I analyzed the API calls, optimized database queries, and implemented caching strategies.
-   - **Result:** The API latency was reduced by 40%, leading to faster response times and improved user experience.
+1. **Tell me about a time you improved a process or system.**
+   - **Situation:** At Acme Corp, our public REST API had high latency issues.
+   - **Task:** I was tasked with improving its performance.
+   - **Action:** I analyzed the API's usage patterns and identified bottlenecks. I then optimized the database queries and implemented caching.
+   - **Result:** This led to a 40% reduction in average latency, improving user satisfaction and system efficiency.
+2. **Describe a challenging project you worked on and how you managed it.**
+   - **Situation:** At StartupXYZ, I was responsible for developing a billing microservice.
+   - **Task:** The challenge was integrating it with existing payment systems like Stripe and Braintree under tight deadlines.
+   - **Action:** I broke down the project into smaller tasks, prioritized them, and collaborated closely with the payment teams.
+   - **Result:** We successfully launched the service on time, which streamlined the billing process and reduced manual errors.
+3. **Give an example of a time you had to mentor a junior engineer.**
+   - **Situation:** At Acme Corp, two junior engineers joined my team.
+   - **Task:** I needed to onboard them and improve their coding skills.
+   - **Action:** I set up regular code review sessions and provided feedback on their work, introducing best practices and standards.
+   - **Result:** Both engineers quickly became productive team members, contributing quality code to our projects.
+4. **Tell me about a time you had to resolve a production incident.**
+   - **Situation:** A critical service at Acme Corp experienced downtime due to a database issue.
+   - **Task:** I had to quickly identify and resolve the problem.
+   - **Action:** I used Datadog to analyze logs and metrics, pinpointing a query that caused a deadlock. I optimized the query and added monitoring alerts.
+   - **Result:** The service was restored promptly, and similar incidents were prevented in the future.
+5. **Describe a time you contributed to an open-source project.**
+   - **Situation:** At StartupXYZ, I wanted to enhance a gRPC middleware library.
+   - **Task:** My goal was to add new features that would benefit both our company and the community.
+   - **Action:** I developed and submitted a pull request with the new features, collaborating with the maintainers for feedback.
+   - **Result:** The contribution was merged, earning over 800 stars on GitHub, and improved our internal systems' performance.
 ## Culture-Fit Questions
-1. **How do you ensure your work aligns with Stripe's mission to increase the GDP of the internet?**
-   - **Model Answer:** I focus on building scalable and reliable backend systems that enhance the efficiency of online transactions, directly contributing to Stripe's mission of expanding internet commerce.
-2. **Can you provide an example of how you've contributed to a collaborative work environment?**
-   - **Model Answer:** At Acme Corp, I introduced code review standards and encouraged open feedback sessions, fostering a culture of collaboration and continuous learning within the team.
-3. **How do you incorporate diversity and inclusion into your work practices?**
-   - **Model Answer:** I actively seek diverse perspectives during brainstorming sessions and ensure that all team members feel heard and valued, which leads to more innovative and effective solutions.
+1. **How do you embody Stripe's value of continuous learning and innovation in your work?**
+   - **Model Answer:** I regularly engage with new technologies and methodologies to improve my skills. For instance, I recently took a course on advanced distributed systems, which I applied to optimize our event processing pipeline at Acme Corp.
+2. **Describe a time you took initiative to solve a problem at work.**
+   - **Model Answer:** At Acme Corp, I noticed our observability was lacking, leading to delayed incident response. I took the initiative to integrate Datadog for better monitoring, which significantly reduced our incident response times.
+3. **How do you ensure inclusivity and collaboration in a team setting?**
+   - **Model Answer:** I foster an open communication environment where all team members feel comfortable sharing ideas. During code reviews, I encourage constructive feedback and ensure everyone's voice is heard, which has led to more innovative solutions.
 ## Questions to Ask the Interviewer
-1. **Can you elaborate on how Stripe's engineering team collaborates with product teams to prioritize and develop new features?**
-2. **What are some of the biggest challenges Stripe is currently facing in scaling its backend systems, and how is the team addressing them?**
-3. **How does Stripe measure and improve the developer experience for both internal and external developers?**
-4. **Can you share more about the opportunities for professional growth and learning within the engineering team at Stripe?**
-5. **How does Stripe ensure that its engineering practices remain aligned with its mission and values as the company grows?**
+1. **Can you describe the team structure and how backend engineers collaborate with other teams at Stripe?**
+2. **What are some of the biggest challenges currently facing the backend engineering team, and how can a new hire contribute?**
+3. **How does Stripe support continuous learning and professional development for its engineers?**
+4. **Can you share more about Stripe's technical roadmap and any upcoming projects that the backend team will be working on?**
+5. **How does Stripe measure success for backend engineers, and what are the key performance indicators?**

@@ -1,25 +1,25 @@
 ```markdown
 # Jane Smith
-[jane@example.com](mailto:jane@example.com) | [github.com/janesmith](https://github.com/janesmith) | San Francisco, CA
+jane@example.com | github.com/janesmith | San Francisco, CA
 
 ## SUMMARY
-Experienced backend engineer with over 4 years in building scalable and reliable Python and Go services. Adept at designing APIs that enhance developer experience and skilled in distributed systems. Passionate about contributing to economic infrastructure through innovative solutions.
+Experienced Backend Engineer with over 4 years in designing and building distributed systems and scalable APIs using Python and Go. Demonstrated expertise in improving developer experience and reducing production incidents through effective debugging and root cause analysis. Passionate about contributing to technical roadmaps and enhancing API performance for better developer engagement.
 
 ## EXPERIENCE
 
 **Senior Software Engineer**  
-Acme Corp (2022–Present)  
-- Designed and built a high-throughput event processing pipeline with Python and Kafka, achieving scalability to handle 50K events per second.
-- Led the redesign of a public REST API, reducing average latency by 40% and enhancing developer experience.
-- Mentored junior engineers and established code review standards, fostering a culture of clear communication and continuous improvement.
-- Improved system observability with Datadog, reducing production incidents by 30% through effective debugging and root cause analysis.
+Acme Corp (2022–Present)
+- Designed and built high-throughput event processing pipelines using Python and Kafka, handling 50K events/sec, enhancing system scalability.
+- Led the redesign of public REST APIs, achieving a 40% reduction in average latency, significantly improving developer experience.
+- Mentored junior engineers and established code review standards, fostering a culture of clear communication and continuous learning.
+- Reduced production incidents by 30% through improved observability with Datadog and structured logging, focusing on root cause elimination.
 
 **Software Engineer**  
-StartupXYZ (2020–2022)  
-- Developed a core billing microservice in Go, integrating with Stripe and Braintree, contributing to the financial infrastructure.
-- Designed a PostgreSQL schema for efficient subscription lifecycle management, supporting scalability for millions of users.
-- Contributed to an open-source gRPC middleware library, enhancing community developer tools and APIs.
-- Operated in a fast-paced environment, collaborating closely with product teams to ship features weekly.
+StartupXYZ (2020–2022)
+- Developed a core billing microservice in Go, integrating seamlessly with Stripe and Braintree, contributing to financial infrastructure.
+- Designed PostgreSQL schemas for subscription lifecycle management, optimizing database performance and reliability.
+- Contributed to an open-source gRPC middleware library with over 800 GitHub stars, showcasing commitment to community and open source contributions.
+- Operated in a fast-paced environment, consistently shipping features to production, demonstrating adaptability and efficiency.
 
 ## SKILLS
 - **Languages:** Python, Go, TypeScript
@@ -30,8 +30,4 @@ StartupXYZ (2020–2022)
 ## EDUCATION
 **B.Sc. Computer Science**  
 UC Berkeley, 2020
-
----
-
-*Note: This resume has been tailored to align with Stripe's focus on backend engineering, API design, and developer experience, while emphasizing relevant past achievements and contributions to payment systems.*
 ```

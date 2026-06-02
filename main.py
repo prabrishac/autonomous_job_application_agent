@@ -6,6 +6,7 @@ Usage:
     python -m autonomous_job_application_agent.main
 """
 
+import json
 import os
 import sys
 import uuid
@@ -17,6 +18,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from autonomous_job_application_agent.graph import build_graph
 from autonomous_job_application_agent.state import AgentState
+from autonomous_job_application_agent.guardrails.pii_guard import PIIBlockedError
 
 
 SAMPLE_JD = """
@@ -90,7 +92,6 @@ def print_separator(title: str = ""):
 
 
 def display_state(state: dict):
-    import json
     print_separator("COMPANY RESEARCH")
     print(state.get("company_research", "—")[:600])
 
@@ -109,6 +110,23 @@ def display_state(state: dict):
     print_separator("QUALITY CHECK")
     print(f"Score: {state.get('quality_score', 0):.2f}")
     print(state.get("quality_feedback", ""))
+
+
+def display_fingerprint(state: dict):
+    """A hashable snapshot of everything display_state() prints.
+
+    Used to detect whether the generated documents actually changed, so we can
+    skip reprinting the full analysis when nothing was regenerated (e.g. after
+    'irrelevant' feedback)."""
+    return (
+        state.get("company_research", ""),
+        json.dumps(state.get("jd_analysis", {}), sort_keys=True),
+        state.get("tailored_resume", ""),
+        state.get("cover_letter", ""),
+        tuple(state.get("interview_questions", [])),
+        state.get("quality_score", 0.0),
+        state.get("quality_feedback", ""),
+    )
 
 
 def export_outputs(state: dict):
@@ -161,30 +179,47 @@ def main():
         "quality_feedback": "",
         "revision_count": 0,
         "human_feedback": "",
+        "feedback_type": "",
         "messages": [],
+        # PII guardrail — populated by the pii_guardrail node
+        "pii_report": {},
+        "pii_mapping": {},
+        "sanitized_resume": "",
     }
 
     print("\n🚀 Starting agent pipeline...\n")
 
-    for event in graph.stream(initial_state, config=config):
-        for node_name, updates in event.items():
-            if node_name == "__interrupt__":
-                continue
-            for msg in updates.get("messages", []):
-                print(f"  {msg}")
+    try:
+        for event in graph.stream(initial_state, config=config):
+            for node_name, updates in event.items():
+                if node_name == "__interrupt__":
+                    continue
+                for msg in updates.get("messages", []):
+                    print(f"  {msg}")
+    except PIIBlockedError as exc:
+        print(f"\n🚫 BLOCKED — {exc}")
+        sys.exit(1)
 
     current = graph.get_state(config)
     state_values = current.values
 
+    last_fingerprint = None
+
     while True:
-        display_state(state_values)
+        fingerprint = display_fingerprint(state_values)
+        if fingerprint != last_fingerprint:
+            display_state(state_values)
+            last_fingerprint = fingerprint
+        else:
+            print_separator()
+            print("(documents unchanged — skipping re-display)")
 
         print_separator("HUMAN REVIEW")
         print(f"Quality score: {state_values.get('quality_score', 0):.2f}")
         print(f"Revision #{state_values.get('revision_count', 0)}")
         print("\nOptions:")
-        print("  • Type 'approve' to finalise and export documents")
-        print("  • Type feedback to improve specific sections")
+        print("  • Type 'approve' (or 'ok', 'looks good') to finalise and export")
+        print("  • Type specific feedback to improve the documents")
         print("  • Examples: 'make cover letter shorter', 'add more Python to resume'\n")
 
         feedback = input("Your input: ").strip()
@@ -193,23 +228,25 @@ def main():
 
         graph.update_state(config, {"human_feedback": feedback})
 
-        if feedback.lower() in ("approve", "approved", "ok", "looks good", "yes"):
-            for event in graph.stream(None, config=config):
-                pass
+        # Resume the graph — classify_feedback will decide what happens next:
+        #   approve    → graph reaches END
+        #   actionable → regeneration cycle, then re-interrupt at human_review
+        #   irrelevant → re-interrupt at human_review immediately (no regeneration)
+        for event in graph.stream(None, config=config):
+            for node_name, updates in event.items():
+                if node_name == "__interrupt__":
+                    continue
+                for msg in updates.get("messages", []):
+                    print(f"  {msg}")
+
+        current = graph.get_state(config)
+        state_values = current.values
+
+        # Graph reached END — no pending nodes left
+        if not current.next:
             print("\n✅ Approved! Exporting documents...")
             export_outputs(state_values)
             break
-        else:
-            print("\n🔄 Regenerating with your feedback...\n")
-            for event in graph.stream(None, config=config):
-                for node_name, updates in event.items():
-                    if node_name == "__interrupt__":
-                        continue
-                    for msg in updates.get("messages", []):
-                        print(f"  {msg}")
-
-            current = graph.get_state(config)
-            state_values = current.values
 
 
 if __name__ == "__main__":

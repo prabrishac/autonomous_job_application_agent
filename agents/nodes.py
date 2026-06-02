@@ -17,6 +17,65 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from autonomous_job_application_agent.state import AgentState
 from autonomous_job_application_agent.tools.search_tools import web_search, fetch_url
+from autonomous_job_application_agent.guardrails.pii_guard import (
+    scan_pii,
+    redact_pii,
+    restore_pii,
+    sanitize_log,
+    assert_no_sensitive_pii,
+    PIIBlockedError,
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NODE 0 — PII guardrail  (runs first, before any LLM call)
+#
+# What it does:
+#   1. Scans resume_text for PII using regex patterns.
+#   2. Blocks immediately if sensitive-tier PII (SSN, credit card, passport)
+#      is found — raises PIIBlockedError before anything leaves the device.
+#   3. Redacts standard PII (email, phone, address, URLs) with reversible
+#      [PII:TYPE:uid] tokens and stores the mapping in state.
+#   4. Saves the cleaned copy as sanitized_resume — analysis nodes (research,
+#      analyze_jd) use this so raw contact details never reach the LLM.
+#   5. tailor_resume and write_cover_letter use the original resume_text
+#      because the contact info must appear in the final documents; the PII
+#      mapping is used to restore tokens in those outputs if needed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def pii_guardrail(state: AgentState) -> dict:
+    """
+    Gate-keeper node — must be the first node in the graph.
+    Scans inputs for PII and populates state with the redacted copy + mapping.
+    """
+    resume = state["resume_text"]
+
+    # ── Step 1: detect ────────────────────────────────────────────────────────
+    report, findings = scan_pii(resume)
+
+    # ── Step 2: block on sensitive PII ────────────────────────────────────────
+    try:
+        assert_no_sensitive_pii(report, source="resume")
+    except PIIBlockedError as exc:
+        raise PIIBlockedError(str(exc)) from exc
+
+    # ── Step 3: redact standard PII for analysis nodes ────────────────────────
+    sanitized, mapping = redact_pii(resume, findings)
+
+    # ── Step 4: build a safe summary for logs (no raw values) ─────────────────
+    if report.counts:
+        summary_parts = [f"{t}×{n}" for t, n in sorted(report.counts.items())]
+        log_msg = "🔒 PII guardrail — detected in resume: " + ", ".join(summary_parts) + \
+                  ". Redacted for LLM analysis nodes; restored in final documents."
+    else:
+        log_msg = "🔒 PII guardrail — no PII detected in resume."
+
+    return {
+        "pii_report": report.counts,
+        "pii_mapping": mapping,
+        "sanitized_resume": sanitized,
+        "messages": [log_msg],
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -159,6 +218,11 @@ def tailor_resume(state: AgentState) -> dict:
         if human_feedback else ""
     )
 
+    # Use sanitized_resume (PII redacted) for the LLM call; restore real
+    # contact details in the output so the final document is complete.
+    sanitized = state.get("sanitized_resume") or state["resume_text"]
+    mapping = state.get("pii_mapping", {})
+
     response = llm.invoke([
         SystemMessage(content=(
             "You are an expert resume writer and career coach. "
@@ -170,10 +234,12 @@ def tailor_resume(state: AgentState) -> dict:
             "3. Rewrite the summary/objective for this role.\n"
             "4. Do NOT fabricate experience, companies, or skills.\n"
             "5. Output in clean markdown format.\n"
-            "6. Preserve all real experience — only reframe it."
+            "6. Preserve all real experience — only reframe it.\n"
+            "7. Keep any [PII:*] placeholder tokens exactly as-is — they will be "
+            "replaced with real contact details after your response."
         )),
         HumanMessage(content=(
-            f"## Original Resume\n{state['resume_text']}\n\n"
+            f"## Original Resume\n{sanitized}\n\n"
             f"## Job Description\n{state['job_description']}\n\n"
             f"## Key Skills & Keywords to Include\n"
             f"{json.dumps(state.get('jd_analysis', {}), indent=2)}\n\n"
@@ -182,8 +248,11 @@ def tailor_resume(state: AgentState) -> dict:
         ))
     ])
 
+    # Restore real PII values (email, phone, etc.) in the final document
+    final_resume = restore_pii(response.content, mapping)
+
     return {
-        "tailored_resume": response.content,
+        "tailored_resume": final_resume,
         "messages": ["📄 Resume tailored for the role."]
     }
 
@@ -207,6 +276,11 @@ def write_cover_letter(state: AgentState) -> dict:
         if human_feedback else ""
     )
 
+    # Use sanitized_resume (PII redacted) for the LLM call; restore real
+    # contact details in the output so the final document is complete.
+    sanitized = state.get("sanitized_resume") or state["resume_text"]
+    mapping = state.get("pii_mapping", {})
+
     response = llm.invoke([
         SystemMessage(content=(
             f"You are an expert cover letter writer. Write in a {tone} tone.\n"
@@ -217,20 +291,25 @@ def write_cover_letter(state: AgentState) -> dict:
             "4. Closing: confident, specific call to action.\n"
             "5. Total length: 3-4 paragraphs, under 350 words.\n"
             "6. NO clichés: avoid 'I am writing to express', 'passion for', 'team player'.\n"
-            "7. Output in clean markdown."
+            "7. Output in clean markdown.\n"
+            "8. Keep any [PII:*] placeholder tokens exactly as-is — they will be "
+            "replaced with real contact details after your response."
         )),
         HumanMessage(content=(
             f"## Target Company: {company}\n\n"
             f"## Company Research\n{state.get('company_research', '')}\n\n"
             f"## Job Description\n{state['job_description']}\n\n"
-            f"## Candidate Resume\n{state['resume_text']}\n\n"
+            f"## Candidate Resume\n{sanitized}\n\n"
             f"## JD Analysis\n{json.dumps(state.get('jd_analysis', {}), indent=2)}"
             f"{feedback_section}"
         ))
     ])
 
+    # Restore real PII values (email, phone, etc.) in the final document
+    final_letter = restore_pii(response.content, mapping)
+
     return {
-        "cover_letter": response.content,
+        "cover_letter": final_letter,
         "messages": ["✉️ Cover letter written."]
     }
 
@@ -246,6 +325,9 @@ def prepare_interview(state: AgentState) -> dict:
     llm = get_llm(temperature=0.4)
     company = state["company_name"]
 
+    # Interview prep uses the sanitized resume — no PII needed in Q&A output
+    sanitized = state.get("sanitized_resume") or state["resume_text"]
+
     response = llm.invoke([
         SystemMessage(content=(
             "You are a senior interview coach. Generate a targeted interview prep guide.\n"
@@ -260,7 +342,7 @@ def prepare_interview(state: AgentState) -> dict:
             f"## Company: {company}\n\n"
             f"## Company Research\n{state.get('company_research', '')}\n\n"
             f"## Job Description\n{state['job_description']}\n\n"
-            f"## Candidate Resume\n{state['resume_text']}\n\n"
+            f"## Candidate Resume\n{sanitized}\n\n"
             f"## JD Analysis\n{json.dumps(state.get('jd_analysis', {}), indent=2)}"
         ))
     ])
@@ -313,10 +395,14 @@ def aggregate_outputs(state: AgentState) -> dict:
         score = 0.5
         feedback = response.content[:300]
 
+    # Sanitize feedback before storing in logs — quality feedback should never
+    # echo back PII from the resume into the message stream.
+    safe_feedback = sanitize_log(feedback)
+
     return {
         "quality_score": score,
         "quality_feedback": feedback,
-        "messages": [f"🔎 Quality check: score={score:.2f}. {feedback}"]
+        "messages": [f"🔎 Quality check: score={score:.2f}. {safe_feedback}"]
     }
 
 
@@ -328,10 +414,101 @@ def human_review(state: AgentState) -> dict:
     """
     Interrupt point — LangGraph pauses here awaiting human input.
     Feedback is injected via graph.update_state() in main.py then graph is resumed.
+    revision_count is NOT incremented here — only classify_feedback does that,
+    and only when feedback is actionable (prevents count inflation on irrelevant input).
     """
     feedback = state.get("human_feedback", "approve")
-
     return {
-        "revision_count": state.get("revision_count", 0) + 1,
         "messages": [f"👤 Human review: '{feedback[:80]}'"]
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NODE 7 — Feedback classifier
+#
+# Runs immediately after the human_review interrupt is resumed.
+# Uses a fast LLM call to put the feedback into one of three buckets:
+#
+#   approve    → user is satisfied; graph routes to END
+#   actionable → feedback contains specific, usable improvement instructions;
+#                graph routes to tailor_resume for regeneration
+#   irrelevant → feedback is gibberish, too vague, or off-topic;
+#                graph routes back to human_review (triggers interrupt again)
+#                so the user is prompted without wasting an LLM cycle
+# ─────────────────────────────────────────────────────────────────────────────
+
+_APPROVAL_KEYWORDS = frozenset(
+    ["approve", "approved", "ok", "looks good", "yes", "lgtm", "ship it", "y", "done"]
+)
+
+def classify_feedback(state: AgentState) -> dict:
+    """
+    Classify human_feedback and set feedback_type in state.
+    Increments revision_count only on actionable feedback.
+    """
+    feedback = state.get("human_feedback", "").strip()
+
+    # ── Fast path: explicit approval keyword ──────────────────────────────────
+    if feedback.lower() in _APPROVAL_KEYWORDS:
+        return {
+            "feedback_type": "approve",
+            "messages": ["✅ Feedback classified as approval."],
+        }
+
+    # ── Fast path: empty or too short to be useful ────────────────────────────
+    if len(feedback) < 8:
+        return {
+            "feedback_type": "irrelevant",
+            "messages": [
+                f"⚠️  Feedback '{feedback}' is too short to act on. "
+                "Please describe what to improve (e.g. 'make the summary shorter') "
+                "or type 'approve' to finish."
+            ],
+        }
+
+    # ── LLM classification ────────────────────────────────────────────────────
+    llm = get_llm(temperature=0)
+    response = llm.invoke([
+        SystemMessage(content=(
+            "You are a feedback classifier for a job application assistant.\n"
+            "The assistant produces a tailored resume, cover letter, and interview prep guide.\n\n"
+            "Classify the user's feedback into exactly one of these categories:\n"
+            "  approve    — user is satisfied and wants to finish "
+            "(e.g. 'looks good', 'all good', 'perfect', 'send it')\n"
+            "  actionable — feedback contains specific, usable instructions for improving "
+            "the resume, cover letter, or interview prep "
+            "(e.g. 'add more Python keywords', 'shorten the cover letter', "
+            "'focus on leadership experience')\n"
+            "  irrelevant — feedback is gibberish, random characters, off-topic, "
+            "or too vague to act on "
+            "(e.g. 'asdf', 'I don't know', 'whatever', 'hello', general questions)\n\n"
+            "Reply with ONLY one word: approve, actionable, or irrelevant."
+        )),
+        HumanMessage(content=f"User feedback: {feedback}")
+    ])
+
+    classification = response.content.strip().lower()
+    if classification not in ("approve", "actionable", "irrelevant"):
+        classification = "irrelevant"
+
+    if classification == "approve":
+        return {
+            "feedback_type": "approve",
+            "messages": ["✅ Feedback classified as approval."],
+        }
+
+    if classification == "actionable":
+        return {
+            "feedback_type": "actionable",
+            "revision_count": state.get("revision_count", 0) + 1,
+            "messages": [f"✏️  Actionable feedback — regenerating documents with: '{feedback[:80]}'"],
+        }
+
+    # irrelevant
+    return {
+        "feedback_type": "irrelevant",
+        "messages": [
+            f"⚠️  Feedback doesn't seem actionable: '{feedback[:60]}'. "
+            "Please provide specific improvement instructions or type 'approve' to finish."
+        ],
     }
