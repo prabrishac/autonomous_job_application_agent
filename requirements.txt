@@ -5,3 +5,4 @@ langgraph>=0.2.0
 openai>=1.40.0
 python-dotenv>=1.0.0
 fpdf2>=2.8.4
+pypdf>=6.0.0

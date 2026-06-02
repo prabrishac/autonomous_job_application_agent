@@ -130,6 +130,96 @@
     .input-ta  { height: 220px; }
     .fb-ta     { height: 90px; resize: vertical; width: 100%; }
 
+    /* ── PDF Upload row ─────────────────────────────────────────────────── */
+    .upload-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Hidden real file input */
+    .upload-row input[type="file"] { display: none; }
+
+    /* Dashed "Upload PDF" trigger button */
+    .upload-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 13px;
+      border-radius: 6px;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--primary);
+      background: var(--primary-light);
+      border: 1.5px dashed var(--primary);
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+      user-select: none;
+    }
+    .upload-trigger:hover {
+      background: var(--primary);
+      color: #fff;
+      border-style: solid;
+    }
+    .upload-trigger.disabled-trigger {
+      opacity: .45;
+      pointer-events: none;
+    }
+
+    /* Green badge shown after successful upload */
+    .file-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px 3px 10px;
+      border-radius: 20px;
+      background: #d1fae5;
+      border: 1px solid #6ee7b7;
+      font-size: .75rem;
+      color: #065f46;
+      max-width: 220px;
+    }
+    .file-badge-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .file-badge-clear {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #059669;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 0 0 2px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+    }
+    .file-badge-clear:hover { color: #dc2626; }
+
+    /* Parsing spinner text */
+    .upload-parsing {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: .75rem;
+      color: var(--gray-500);
+      font-style: italic;
+    }
+    .upload-parsing .spin {
+      width: 11px; height: 11px;
+      border-color: var(--gray-400);
+    }
+
+    /* Drag-over highlight on the textarea */
+    .input-ta.drag-over {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+    }
+
     /* ── Buttons ────────────────────────────────────────────────────────── */
     .btn {
       display: inline-flex;
@@ -433,14 +523,61 @@
     </div>
     <div class="panel-body">
       <div class="input-grid">
+
+        <!-- ── Job Description ── -->
         <div class="field">
-          <label for="jdInput">Job Description</label>
-          <textarea id="jdInput" class="input-ta" placeholder="Paste the full job description here — role title, responsibilities, required skills, company background…"></textarea>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <label for="jdInput" style="margin-bottom:0;">Job Description</label>
+          </div>
+          <div class="upload-row">
+            <label class="upload-trigger" id="jdUploadTrigger" title="Upload a PDF and extract its text">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload PDF
+              <input type="file" id="jdFile" accept=".pdf,application/pdf"
+                     onchange="handlePdfUpload(this, 'jdInput', 'jdBadge', 'jdParsing', 'jdUploadTrigger')">
+            </label>
+            <span id="jdBadge" class="file-badge hidden">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span class="file-badge-name" id="jdBadgeName"></span>
+              <button class="file-badge-clear" title="Remove uploaded file"
+                      onclick="clearPdfUpload('jdFile','jdInput','jdBadge','jdUploadTrigger')">&#x2715;</button>
+            </span>
+            <span id="jdParsing" class="upload-parsing hidden">
+              <span class="spin"></span>Parsing PDF…
+            </span>
+          </div>
+          <textarea id="jdInput" class="input-ta" placeholder="Paste the full job description here — or upload a PDF above."
+                    ondragover="onDragOver(event, this)" ondragleave="onDragLeave(event, this)"
+                    ondrop="onDrop(event, this, 'jdFile','jdBadge','jdParsing','jdUploadTrigger')"></textarea>
         </div>
+
+        <!-- ── Resume ── -->
         <div class="field">
-          <label for="resumeInput">Your Resume</label>
-          <textarea id="resumeInput" class="input-ta" placeholder="Paste your resume as plain text — work history, skills, education, contact details…"></textarea>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+            <label for="resumeInput" style="margin-bottom:0;">Your Resume</label>
+          </div>
+          <div class="upload-row">
+            <label class="upload-trigger" id="resumeUploadTrigger" title="Upload a PDF and extract its text">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload PDF
+              <input type="file" id="resumeFile" accept=".pdf,application/pdf"
+                     onchange="handlePdfUpload(this, 'resumeInput', 'resumeBadge', 'resumeParsing', 'resumeUploadTrigger')">
+            </label>
+            <span id="resumeBadge" class="file-badge hidden">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span class="file-badge-name" id="resumeBadgeName"></span>
+              <button class="file-badge-clear" title="Remove uploaded file"
+                      onclick="clearPdfUpload('resumeFile','resumeInput','resumeBadge','resumeUploadTrigger')">&#x2715;</button>
+            </span>
+            <span id="resumeParsing" class="upload-parsing hidden">
+              <span class="spin"></span>Parsing PDF…
+            </span>
+          </div>
+          <textarea id="resumeInput" class="input-ta" placeholder="Paste your resume as plain text — or upload a PDF above."
+                    ondragover="onDragOver(event, this)" ondragleave="onDragLeave(event, this)"
+                    ondrop="onDrop(event, this, 'resumeFile','resumeBadge','resumeParsing','resumeUploadTrigger')"></textarea>
         </div>
+
       </div>
       <div class="row-right">
         <button class="btn btn-primary" id="submitBtn" onclick="handleSubmit()">
@@ -629,6 +766,128 @@
   function markAllDone() {
     NODES.forEach(n => { stepStates[n.id] = 'done'; });
     renderSteps();
+  }
+
+  /* ── PDF Upload ─────────────────────────────────────────────────────────── */
+
+  /**
+   * Called when the user picks a file via the <input type="file">.
+   * fileInput  — the <input> element itself
+   * textareaId — textarea to populate with extracted text
+   * badgeId    — the green file-badge <span>
+   * parsingId  — the "Parsing PDF…" spinner <span>
+   * triggerId  — the upload-trigger <label> (dimmed while parsing)
+   */
+  async function handlePdfUpload(fileInput, textareaId, badgeId, parsingId, triggerId) {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast('Only PDF files are accepted.', 'err');
+      fileInput.value = '';
+      return;
+    }
+
+    _startParsing(badgeId, parsingId, triggerId);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/parse-pdf', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.detail || 'Failed to parse PDF.');
+      }
+      const data = await res.json();
+      document.getElementById(textareaId).value = data.text;
+      _showBadge(badgeId, badgeId + 'Name', file.name);
+      toast(`Parsed "${file.name}" — ${data.pages} page${data.pages === 1 ? '' : 's'}, ${data.chars.toLocaleString()} characters.`, 'ok');
+    } catch (err) {
+      toast(err.message, 'err');
+      fileInput.value = '';
+    } finally {
+      _stopParsing(parsingId, triggerId);
+    }
+  }
+
+  /** Clear the uploaded file and reset the textarea */
+  function clearPdfUpload(fileInputId, textareaId, badgeId, triggerId) {
+    document.getElementById(fileInputId).value = '';
+    document.getElementById(textareaId).value  = '';
+    document.getElementById(badgeId).classList.add('hidden');
+    document.getElementById(triggerId).classList.remove('disabled-trigger');
+  }
+
+  /** Drag-and-drop: highlight the textarea drop zone */
+  function onDragOver(e, ta) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    ta.classList.add('drag-over');
+  }
+  function onDragLeave(e, ta) {
+    ta.classList.remove('drag-over');
+  }
+
+  /** Drag-and-drop: drop a PDF onto the textarea */
+  async function onDrop(e, ta, fileInputId, badgeId, parsingId, triggerId) {
+    e.preventDefault();
+    ta.classList.remove('drag-over');
+
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast('Only PDF files are accepted.', 'err');
+      return;
+    }
+
+    // Assign the dropped file to the hidden input so clearPdfUpload works
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById(fileInputId).files = dt.files;
+
+    _startParsing(badgeId, parsingId, triggerId);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/parse-pdf', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to parse PDF.');
+      }
+      const data = await res.json();
+      ta.value = data.text;
+      _showBadge(badgeId, badgeId + 'Name', file.name);
+      toast(`Parsed "${file.name}" — ${data.pages} page${data.pages === 1 ? '' : 's'}.`, 'ok');
+    } catch (err) {
+      toast(err.message, 'err');
+      document.getElementById(fileInputId).value = '';
+    } finally {
+      _stopParsing(parsingId, triggerId);
+    }
+  }
+
+  /* Upload helper internals */
+  function _startParsing(badgeId, parsingId, triggerId) {
+    document.getElementById(badgeId).classList.add('hidden');
+    document.getElementById(parsingId).classList.remove('hidden');
+    document.getElementById(triggerId).classList.add('disabled-trigger');
+  }
+  function _stopParsing(parsingId, triggerId) {
+    document.getElementById(parsingId).classList.add('hidden');
+    document.getElementById(triggerId).classList.remove('disabled-trigger');
+  }
+  function _showBadge(badgeId, badgeNameId, filename) {
+    const badge = document.getElementById(badgeId);
+    document.getElementById(badgeNameId).textContent = filename;
+    badge.classList.remove('hidden');
+  }
+
+  /** Also reset upload state when "Start New Application" is clicked */
+  function resetUploads() {
+    clearPdfUpload('jdFile',     'jdInput',     'jdBadge',     'jdUploadTrigger');
+    clearPdfUpload('resumeFile', 'resumeInput', 'resumeBadge', 'resumeUploadTrigger');
   }
 
   /* ── Submit ─────────────────────────────────────────────────────────────── */
@@ -936,6 +1195,7 @@
     document.getElementById('outputSection').classList.remove('visible');
     showProgress(false);
     setSubmitBusy(false);
+    resetUploads();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 

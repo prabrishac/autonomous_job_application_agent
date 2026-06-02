@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +27,7 @@ from autonomous_job_application_agent.graph import build_graph
 from autonomous_job_application_agent.state import AgentState
 from autonomous_job_application_agent.guardrails.pii_guard import PIIBlockedError
 from autonomous_job_application_agent.utils.pdf_export import build_pdf
+from autonomous_job_application_agent.utils.pdf_parser import extract_pdf_text
 
 app = FastAPI(title="Autonomous Job Application Agent")
 
@@ -283,3 +284,33 @@ async def export_pdf(req: ExportPDFRequest):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
     )
+
+
+@app.post("/api/parse-pdf")
+async def parse_pdf(file: UploadFile = File(...)):
+    """
+    Accept a PDF upload and return the extracted plain text.
+
+    The client uses this to populate the Job Description / Resume textareas
+    without a page reload.  Only PDF content type is accepted.
+    """
+    filename = file.filename or ""
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are accepted. Please upload a .pdf file.",
+        )
+
+    data = await file.read()
+
+    try:
+        text, page_count = extract_pdf_text(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return {
+        "text": text,
+        "pages": page_count,
+        "filename": filename,
+        "chars": len(text),
+    }
