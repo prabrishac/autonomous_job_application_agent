@@ -37,12 +37,14 @@ def route_after_aggregate(state: AgentState) -> str:
     return "tailor_resume"
 
 
-def route_after_classify(state: AgentState) -> str:
+def route_after_classify(state: AgentState):
     ft = state.get("feedback_type", "irrelevant")
     if ft == "approve":
         return END
     if ft == "actionable":
-        return "tailor_resume"
+        # Fan out to all three generation nodes in parallel.
+        # Each node has skip logic: it regenerates only when its own feedback field is set.
+        return ["tailor_resume", "write_cover_letter", "prepare_interview"]
     return "human_review"   # irrelevant → re-interrupt, no regeneration
 
 
@@ -87,7 +89,13 @@ def build_graph():
     builder.add_conditional_edges(
         "classify_feedback",
         route_after_classify,
-        {END: END, "tailor_resume": "tailor_resume", "human_review": "human_review"}
+        {
+            END: END,
+            "tailor_resume": "tailor_resume",
+            "write_cover_letter": "write_cover_letter",
+            "prepare_interview": "prepare_interview",
+            "human_review": "human_review",
+        }
     )
 
     memory = MemorySaver()

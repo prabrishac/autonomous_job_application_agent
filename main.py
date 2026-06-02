@@ -180,6 +180,9 @@ def main():
         "revision_count": 0,
         "human_feedback": "",
         "feedback_type": "",
+        "resume_feedback": "",
+        "cover_letter_feedback": "",
+        "interview_feedback": "",
         "messages": [],
         # PII guardrail — populated by the pii_guardrail node
         "pii_report": {},

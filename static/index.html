@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Autonomous Job Application Agent</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:       #6366f1;
+      --primary-dark:  #4f46e5;
+      --primary-light: #e0e7ff;
+      --success:       #10b981;
+      --warning:       #f59e0b;
+      --danger:        #ef4444;
+      --gray-50:  #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.05);
+      --shadow-lg: 0 10px 20px rgba(0,0,0,.10), 0 4px 6px rgba(0,0,0,.05);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-800);
+      min-height: 100vh;
+      line-height: 1.55;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #4338ca 0%, #7c3aed 100%);
+      color: #fff;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 10px rgba(67,56,202,.35);
+    }
+    .header-logo {
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+    header h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+    header p {
+      font-size: .8rem;
+      opacity: .75;
+      margin-top: 2px;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    main {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 28px 24px;
+    }
+
+    /* ── Cards / panels ─────────────────────────────────────────────────── */
+    .panel {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 22px;
+    }
+    .panel-header {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--gray-100);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-title {
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--gray-700);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-body { padding: 22px; }
+
+    /* ── Inputs ─────────────────────────────────────────────────────────── */
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 720px) { .input-grid { grid-template-columns: 1fr; } }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--gray-600);
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+
+    textarea, .doc-area {
+      border: 1.5px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: .85rem;
+      font-family: inherit;
+      color: var(--gray-800);
+      background: #fff;
+      resize: vertical;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+    }
+    .input-ta  { height: 220px; }
+    .fb-ta     { height: 90px; resize: vertical; width: 100%; }
+
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: .855rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:not(:disabled):hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(99,102,241,.35); }
+
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:not(:disabled):hover { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(16,185,129,.3); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--gray-600);
+      border: 1.5px solid var(--gray-200);
+    }
+    .btn-outline:not(:disabled):hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+    .btn-sm { padding: 6px 13px; font-size: .8rem; }
+    .btn-xs { padding: 4px 10px; font-size: .75rem; border-radius: 6px; }
+
+    .row-right { display: flex; justify-content: flex-end; margin-top: 18px; }
+
+    /* ── Progress tracker ───────────────────────────────────────────────── */
+    #progressPanel { display: none; }
+    #progressPanel.visible { display: block; }
+
+    .steps-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .step {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: .78rem;
+      font-weight: 500;
+      background: var(--gray-100);
+      color: var(--gray-400);
+      transition: background .25s, color .25s;
+    }
+    .step.active  { background: var(--primary-light); color: var(--primary-dark); }
+    .step.done    { background: #d1fae5; color: #065f46; }
+    .step.error   { background: #fee2e2; color: #991b1b; }
+
+    .spin {
+      width: 12px; height: 12px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-msg {
+      margin-top: 10px;
+      font-size: .8rem;
+      color: var(--gray-500);
+      font-style: italic;
+      min-height: 1.2em;
+    }
+
+    /* ── Quality bar ─────────────────────────────────────────────────────── */
+    .quality-bar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .score-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: .9rem;
+    }
+    .score-high { background: #d1fae5; color: #065f46; }
+    .score-mid  { background: #fef3c7; color: #92400e; }
+    .score-low  { background: #fee2e2; color: #991b1b; }
+
+    .quality-text { font-size: .83rem; color: var(--gray-500); font-style: italic; flex: 1; }
+    .revision-badge {
+      font-size: .75rem;
+      padding: 3px 9px;
+      border-radius: 10px;
+      background: var(--gray-100);
+      color: var(--gray-500);
+    }
+
+    /* ── Output section ──────────────────────────────────────────────────── */
+    #outputSection { display: none; }
+    #outputSection.visible { display: block; }
+
+    .warn-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 18px;
+      background: #fefce8;
+      border: 1.5px solid #fde68a;
+      border-radius: var(--radius);
+      margin-bottom: 18px;
+      font-size: .85rem;
+      color: #92400e;
+      line-height: 1.5;
+    }
+    .warn-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+    .output-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 1100px) { .output-grid { grid-template-columns: 1fr; } }
+    @media (min-width: 1101px) and (max-width: 1350px) { .output-grid { grid-template-columns: 1fr 1fr; } }
+
+    .out-card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--gray-100);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-icon {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .icon-resume    { background: #ede9fe; }
+    .icon-cover     { background: #dbeafe; }
+    .icon-interview { background: #d1fae5; }
+
+    .card-title    { font-size: .9rem; font-weight: 700; color: var(--gray-800); }
+    .card-subtitle { font-size: .73rem; color: var(--gray-400); }
+
+    /* copy button */
+    .copy-btn {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: .72rem;
+      color: var(--gray-500);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .copy-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .copy-btn.copied { border-color: var(--success); color: var(--success); }
+
+    .card-doc {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 380px;
+      padding: 16px 18px;
+    }
+    .doc-pre {
+      font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+      font-size: .78rem;
+      line-height: 1.75;
+      color: var(--gray-700);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .placeholder-text {
+      font-size: .85rem;
+      color: var(--gray-400);
+      font-style: italic;
+    }
+
+    /* Feedback section */
+    .card-feedback {
+      padding: 14px 18px;
+      border-top: 1px solid var(--gray-100);
+      background: var(--gray-50);
+    }
+    .fb-label {
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 7px;
+    }
+    .fb-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 9px;
+      align-items: center;
+    }
+    .fb-hint {
+      font-size: .72rem;
+      color: var(--gray-400);
+      margin-left: auto;
+    }
+
+    /* ── Approve banner ──────────────────────────────────────────────────── */
+    .approve-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 14px 22px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: var(--radius);
+      margin-top: 22px;
+    }
+    .approve-strip p {
+      font-size: .85rem;
+      color: #065f46;
+    }
+
+    /* ── Toast ───────────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      padding: 11px 20px;
+      border-radius: 8px;
+      font-size: .855rem;
+      font-weight: 500;
+      color: #fff;
+      background: var(--gray-800);
+      box-shadow: var(--shadow-lg);
+      z-index: 999;
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all .3s cubic-bezier(.16,1,.3,1);
+      pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.ok   { background: var(--success); }
+    #toast.err  { background: var(--danger); }
+
+    /* ── Misc ────────────────────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    .divider { border: none; border-top: 1px solid var(--gray-100); margin: 18px 0; }
+
+    /* Completed card overlay */
+    .completed-banner {
+      text-align: center;
+      padding: 10px;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--success);
+      background: #ecfdf5;
+      border-top: 1px solid #a7f3d0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">🤖</div>
+  <div>
+    <h1>Autonomous Job Application Agent</h1>
+    <p>Powered by LangGraph · GPT-4o · Tailored resume, cover letter &amp; interview prep</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Input panel ──────────────────────────────────────────────────────── -->
+  <div class="panel" id="inputPanel">
+    <div class="panel-header">
+      <span class="panel-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Inputs
+      </span>
+    </div>
+    <div class="panel-body">
+      <div class="input-grid">
+        <div class="field">
+          <label for="jdInput">Job Description</label>
+          <textarea id="jdInput" class="input-ta" placeholder="Paste the full job description here — role title, responsibilities, required skills, company background…"></textarea>
+        </div>
+        <div class="field">
+          <label for="resumeInput">Your Resume</label>
+          <textarea id="resumeInput" class="input-ta" placeholder="Paste your resume as plain text — work history, skills, education, contact details…"></textarea>
+        </div>
+      </div>
+      <div class="row-right">
+        <button class="btn btn-primary" id="submitBtn" onclick="handleSubmit()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Generate Documents
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Progress panel ──────────────────────────────────────────────────── -->
+  <div class="panel" id="progressPanel">
+    <div class="panel-header">
+      <span class="panel-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Pipeline Progress
+      </span>
+    </div>
+    <div class="panel-body">
+      <div class="steps-wrap" id="stepsWrap"></div>
+      <div class="status-msg" id="statusMsg">Starting…</div>
+    </div>
+  </div>
+
+  <!-- ── Output section ──────────────────────────────────────────────────── -->
+  <div id="outputSection">
+
+    <!-- Quality bar -->
+    <div class="panel" id="qualityPanel">
+      <div class="panel-body">
+        <div class="quality-bar">
+          <div id="scorePill" class="score-pill score-mid">— Quality</div>
+          <span id="qualityText" class="quality-text"></span>
+          <span id="revBadge" class="revision-badge hidden">Revision 0</span>
+          <button class="btn btn-success" id="approveBtn" onclick="approveAll()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Approve All &amp; Finish
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Irrelevant-feedback warning (hidden by default) -->
+    <div id="irrelevantWarn" class="warn-banner hidden">
+      <span class="warn-icon">⚠️</span>
+      <span id="irrelevantWarnText">Your feedback wasn't specific enough to act on. Please describe exactly what to change — e.g. <em>"shorten the cover letter"</em> or <em>"add more Python keywords to the resume"</em> — then click the relevant Regenerate button, or click <strong>Approve All</strong> to finish.</span>
+    </div>
+
+    <!-- Three output cards -->
+    <div class="output-grid">
+
+      <!-- Tailored Resume -->
+      <div class="out-card" id="resumeCard">
+        <div class="card-head">
+          <div class="card-icon icon-resume">📄</div>
+          <div>
+            <div class="card-title">Tailored Resume</div>
+            <div class="card-subtitle">Rewritten to match this role</div>
+          </div>
+          <button class="copy-btn" onclick="copyDoc('resumeDoc', this)" title="Copy to clipboard">Copy</button>
+        </div>
+        <div class="card-doc">
+          <pre class="doc-pre" id="resumeDoc"><span class="placeholder-text">Waiting for generation…</span></pre>
+        </div>
+        <div class="card-feedback">
+          <div class="fb-label">Your Feedback</div>
+          <textarea class="fb-ta" id="fbResume" placeholder="e.g. Emphasise Python more, shorten summary, add Kafka keyword…" disabled></textarea>
+          <div class="fb-actions">
+            <button class="btn btn-outline btn-sm" id="fbResumeBtn" onclick="sendFeedback('resume')" disabled>Regenerate Resume</button>
+            <span class="fb-hint">Only this document is regenerated</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cover Letter -->
+      <div class="out-card" id="coverCard">
+        <div class="card-head">
+          <div class="card-icon icon-cover">✉️</div>
+          <div>
+            <div class="card-title">Cover Letter</div>
+            <div class="card-subtitle">Personalised for the company</div>
+          </div>
+          <button class="copy-btn" onclick="copyDoc('coverDoc', this)" title="Copy to clipboard">Copy</button>
+        </div>
+        <div class="card-doc">
+          <pre class="doc-pre" id="coverDoc"><span class="placeholder-text">Waiting for generation…</span></pre>
+        </div>
+        <div class="card-feedback">
+          <div class="fb-label">Your Feedback</div>
+          <textarea class="fb-ta" id="fbCover" placeholder="e.g. Make it shorter, add a specific project, adjust tone…" disabled></textarea>
+          <div class="fb-actions">
+            <button class="btn btn-outline btn-sm" id="fbCoverBtn" onclick="sendFeedback('cover')" disabled>Regenerate Cover Letter</button>
+            <span class="fb-hint">Only this document is regenerated</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interview Prep -->
+      <div class="out-card" id="interviewCard">
+        <div class="card-head">
+          <div class="card-icon icon-interview">🎯</div>
+          <div>
+            <div class="card-title">Interview Preparation Guide</div>
+            <div class="card-subtitle">Questions, answers &amp; tips</div>
+          </div>
+          <button class="copy-btn" onclick="copyDoc('interviewDoc', this)" title="Copy to clipboard">Copy</button>
+        </div>
+        <div class="card-doc">
+          <pre class="doc-pre" id="interviewDoc"><span class="placeholder-text">Waiting for generation…</span></pre>
+        </div>
+        <div class="card-feedback">
+          <div class="fb-label">Your Feedback</div>
+          <textarea class="fb-ta" id="fbInterview" placeholder="e.g. Add more system-design Qs, focus on leadership, STAR examples…" disabled></textarea>
+          <div class="fb-actions">
+            <button class="btn btn-outline btn-sm" id="fbInterviewBtn" onclick="sendFeedback('interview')" disabled>Regenerate Interview Prep</button>
+            <span class="fb-hint">Only this document is regenerated</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /output-grid -->
+
+    <!-- Completed strip (shown after approval) -->
+    <div class="approve-strip hidden" id="completedStrip">
+      <p>✅ Documents approved and finalized. You can copy them from the cards above.</p>
+      <button class="btn btn-primary btn-sm" onclick="resetForm()">Start a New Application</button>
+    </div>
+
+  </div><!-- /outputSection -->
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+  /* ── Constants ─────────────────────────────────────────────────────────── */
+  const NODES = [
+    { id: 'pii_guardrail',     label: 'PII Check'       },
+    { id: 'parse_input',       label: 'Parse Input'     },
+    { id: 'research_company',  label: 'Research'        },
+    { id: 'analyze_jd',        label: 'Analyse JD'      },
+    { id: 'tailor_resume',     label: 'Resume'          },
+    { id: 'write_cover_letter',label: 'Cover Letter'    },
+    { id: 'prepare_interview', label: 'Interview Prep'  },
+    { id: 'aggregate_outputs', label: 'Quality Check'   },
+    { id: 'human_review',      label: 'Review'          },
+    { id: 'classify_feedback', label: 'Classify'        },
+  ];
+
+  /* ── State ─────────────────────────────────────────────────────────────── */
+  let sessionId   = null;
+  let cursor      = 0;
+  let pollTimer   = null;
+  let stepStates  = {};   // node_id → 'idle' | 'active' | 'done' | 'error'
+
+  /* ── Step tracker ──────────────────────────────────────────────────────── */
+  function initSteps() {
+    stepStates = {};
+    NODES.forEach(n => { stepStates[n.id] = 'idle'; });
+    renderSteps();
+  }
+
+  function renderSteps() {
+    const wrap = document.getElementById('stepsWrap');
+    const firstIdle = NODES.find(n => stepStates[n.id] === 'idle');
+    wrap.innerHTML = NODES.map(n => {
+      let cls = stepStates[n.id] || 'idle';
+      // the first idle step shows as "active" (pulsing)
+      if (n === firstIdle) cls = 'active';
+      let icon = '';
+      if (cls === 'active') icon = `<div class="spin"></div>`;
+      else if (cls === 'done') icon = `<span>✓</span>`;
+      else if (cls === 'error') icon = `<span>✗</span>`;
+      return `<span class="step ${cls}">${icon}${n.label}</span>`;
+    }).join('');
+  }
+
+  function markDone(nodeId) {
+    if (stepStates[nodeId] !== undefined) stepStates[nodeId] = 'done';
+    renderSteps();
+  }
+
+  function markAllDone() {
+    NODES.forEach(n => { stepStates[n.id] = 'done'; });
+    renderSteps();
+  }
+
+  /* ── Submit ─────────────────────────────────────────────────────────────── */
+  async function handleSubmit() {
+    const jd     = document.getElementById('jdInput').value.trim();
+    const resume = document.getElementById('resumeInput').value.trim();
+    if (!jd || !resume) { toast('Please fill in both the job description and resume.', 'err'); return; }
+
+    setSubmitBusy(true);
+    resetOutputSection();
+    showProgress(true);
+    initSteps();
+    setStatus('Submitting…');
+
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_description: jd, resume_text: resume }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Submit failed'); }
+      const data = await res.json();
+      sessionId = data.session_id;
+      cursor    = 0;
+      startPolling();
+    } catch (err) {
+      toast(err.message, 'err');
+      setSubmitBusy(false);
+      showProgress(false);
+    }
+  }
+
+  /* ── Polling ────────────────────────────────────────────────────────────── */
+  function startPolling() {
+    clearInterval(pollTimer);
+    pollTimer = setInterval(poll, 1500);
+  }
+
+  function stopPolling() { clearInterval(pollTimer); pollTimer = null; }
+
+  async function poll() {
+    if (!sessionId) return;
+    try {
+      const res  = await fetch(`/api/status/${sessionId}?cursor=${cursor}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      data.events.forEach(handleEvent);
+      cursor = data.cursor;
+      if (data.status === 'completed' || data.status === 'error') stopPolling();
+    } catch (_) { /* network hiccup — keep polling */ }
+  }
+
+  /* ── Event handler ──────────────────────────────────────────────────────── */
+  function handleEvent(ev) {
+    switch (ev.type) {
+
+      case 'started':
+        setStatus('Agent started — running pipeline…');
+        break;
+
+      case 'node_complete':
+        markDone(ev.node);
+        setStatus(`Completed: ${nodeLabel(ev.node)}`);
+        break;
+
+      case 'awaiting_feedback':
+        markDone('aggregate_outputs');
+        showOutputSection(ev.state);
+        enableFeedback(true);
+        if (ev.state.feedback_type === 'irrelevant') {
+          setIrrelevantWarning(true);
+          setStatus('Feedback not actionable — please provide more specific instructions.');
+          toast('Feedback not actionable — please try again.', 'err');
+        } else {
+          setIrrelevantWarning(false);
+          setStatus('Generation complete — review the documents below and provide feedback or approve.');
+        }
+        break;
+
+      case 'completed':
+        markAllDone();
+        setStatus('All done! Documents finalised.');
+        showOutputSection(ev.state);
+        setCompleted();
+        break;
+
+      case 'error':
+        setStatus(`Error: ${ev.message}`);
+        toast(`Error: ${ev.message}`, 'err');
+        setSubmitBusy(false);
+        enableFeedback(false);
+        break;
+    }
+  }
+
+  /* ── Show outputs ───────────────────────────────────────────────────────── */
+  function showOutputSection(state) {
+    document.getElementById('outputSection').classList.add('visible');
+
+    // Score pill
+    const score = parseFloat(state.quality_score || 0);
+    const pct   = Math.round(score * 100);
+    const pill  = document.getElementById('scorePill');
+    pill.textContent = `${pct}% Quality`;
+    pill.className   = 'score-pill ' + (score >= .8 ? 'score-high' : score >= .6 ? 'score-mid' : 'score-low');
+
+    document.getElementById('qualityText').textContent = state.quality_feedback || '';
+
+    const rev = state.revision_count || 0;
+    if (rev > 0) {
+      const rb = document.getElementById('revBadge');
+      rb.textContent = `Revision ${rev}`;
+      rb.classList.remove('hidden');
+    }
+
+    // Documents
+    setDoc('resumeDoc',    state.tailored_resume);
+    setDoc('coverDoc',     state.cover_letter);
+    setDoc('interviewDoc', state.interview_questions);
+  }
+
+  function setDoc(id, text) {
+    const el = document.getElementById(id);
+    if (text && text.trim()) {
+      el.textContent = text;
+    } else {
+      el.innerHTML = '<span class="placeholder-text">Not yet generated…</span>';
+    }
+  }
+
+  /* ── Feedback ───────────────────────────────────────────────────────────── */
+
+  // Maps card type → { textarea id, api field, graph node, label }
+  const CARD_META = {
+    resume:    { ta: 'fbResume',    btn: 'fbResumeBtn',    field: 'resume_feedback',         node: 'tailor_resume',      label: 'Resume'          },
+    cover:     { ta: 'fbCover',     btn: 'fbCoverBtn',     field: 'cover_letter_feedback',   node: 'write_cover_letter', label: 'Cover Letter'    },
+    interview: { ta: 'fbInterview', btn: 'fbInterviewBtn', field: 'interview_feedback',      node: 'prepare_interview',  label: 'Interview Prep'  },
+  };
+
+  async function sendFeedback(type) {
+    if (!sessionId) return;
+    const meta     = CARD_META[type];
+    const feedback = document.getElementById(meta.ta).value.trim();
+
+    if (!feedback) {
+      toast(`Enter feedback for ${meta.label} first.`, 'err');
+      return;
+    }
+
+    // Disable all feedback controls while the agent is running
+    enableFeedback(false);
+    setIrrelevantWarning(false);
+
+    // Reset only the node being regenerated + downstream quality/review steps
+    resetStepsForRerun([meta.node]);
+    setStatus(`Regenerating ${meta.label}…`);
+
+    try {
+      const body = { resume_feedback: '', cover_letter_feedback: '', interview_feedback: '', approve: false };
+      body[meta.field] = feedback;
+
+      const res = await fetch(`/api/feedback/${sessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Feedback failed'); }
+
+      // Clear only the textarea that was submitted
+      document.getElementById(meta.ta).value = '';
+      toast(`${meta.label} feedback sent — regenerating…`, 'ok');
+      startPolling();
+    } catch (err) {
+      toast(err.message, 'err');
+      enableFeedback(true);
+      // Restore steps to done — request failed so nothing was actually re-run
+      [meta.node, 'aggregate_outputs', 'human_review', 'classify_feedback'].forEach(n => {
+        if (n in stepStates) stepStates[n] = 'done';
+      });
+      renderSteps();
+    }
+  }
+
+  async function approveAll() {
+    if (!sessionId) return;
+    enableFeedback(false);
+    setIrrelevantWarning(false);
+    document.getElementById('approveBtn').disabled = true;
+
+    // Show human_review and classify_feedback as re-running
+    resetStepsForRerun([]);
+    setStatus('Approved — finalising…');
+
+    try {
+      const res = await fetch(`/api/feedback/${sessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume_feedback: '', cover_letter_feedback: '', interview_feedback: '', approve: true }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Approve failed'); }
+      toast('Approved!', 'ok');
+      startPolling();
+    } catch (err) {
+      toast(err.message, 'err');
+      enableFeedback(true);
+      document.getElementById('approveBtn').disabled = false;
+    }
+  }
+
+  // Reset the given generation nodes + always reset aggregate/review/classify
+  function resetStepsForRerun(genNodes) {
+    const alwaysReset = ['aggregate_outputs', 'human_review', 'classify_feedback'];
+    [...genNodes, ...alwaysReset].forEach(n => {
+      if (n in stepStates) stepStates[n] = 'idle';
+    });
+    renderSteps();
+  }
+
+  /* ── UI helpers ─────────────────────────────────────────────────────────── */
+  function enableFeedback(on) {
+    ['fbResume','fbCover','fbInterview'].forEach(id => {
+      document.getElementById(id).disabled = !on;
+    });
+    ['fbResumeBtn','fbCoverBtn','fbInterviewBtn'].forEach(id => {
+      document.getElementById(id).disabled = !on;
+    });
+    document.getElementById('approveBtn').disabled = !on;
+  }
+
+  function clearFeedbackFields() {
+    ['fbResume','fbCover','fbInterview'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  }
+
+  function setCompleted() {
+    enableFeedback(false);
+    document.getElementById('approveBtn').classList.add('hidden');
+    document.getElementById('completedStrip').classList.remove('hidden');
+    setSubmitBusy(false);
+    // Add "Completed" label to each card's feedback section
+    ['resumeCard','coverCard','interviewCard'].forEach(id => {
+      const card = document.getElementById(id);
+      const fb   = card.querySelector('.card-feedback');
+      fb.innerHTML = '<div class="completed-banner">✅ Finalised</div>';
+    });
+  }
+
+  function setIrrelevantWarning(show) {
+    document.getElementById('irrelevantWarn').classList.toggle('hidden', !show);
+  }
+
+  function setSubmitBusy(busy) {
+    document.getElementById('submitBtn').disabled = busy;
+  }
+
+  function showProgress(on) {
+    document.getElementById('progressPanel').classList.toggle('visible', on);
+  }
+
+  function setStatus(msg) {
+    document.getElementById('statusMsg').textContent = msg;
+  }
+
+  function resetOutputSection() {
+    document.getElementById('outputSection').classList.remove('visible');
+    document.getElementById('completedStrip').classList.add('hidden');
+    document.getElementById('approveBtn').classList.remove('hidden');
+    document.getElementById('revBadge').classList.add('hidden');
+    ['resumeDoc','coverDoc','interviewDoc'].forEach(id => {
+      document.getElementById(id).innerHTML = '<span class="placeholder-text">Waiting for generation…</span>';
+    });
+    clearFeedbackFields();
+    enableFeedback(false);
+    // Restore feedback sections in case they were replaced
+    ['resumeCard','coverCard','interviewCard'].forEach(id => {
+      const card = document.getElementById(id);
+      // re-enable textareas if they were replaced
+    });
+  }
+
+  function resetForm() {
+    sessionId = null; cursor = 0;
+    stopPolling();
+    document.getElementById('outputSection').classList.remove('visible');
+    showProgress(false);
+    setSubmitBusy(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function nodeLabel(id) {
+    return (NODES.find(n => n.id === id) || {}).label || id;
+  }
+
+  /* ── Copy to clipboard ──────────────────────────────────────────────────── */
+  function copyDoc(preId, btn) {
+    const text = document.getElementById(preId).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  /* ── Toast ──────────────────────────────────────────────────────────────── */
+  let toastTimer = null;
+  function toast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = `show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 3200);
+  }
+</script>
+
+</body>
+</html>

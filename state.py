@@ -31,8 +31,13 @@ class AgentState(TypedDict):
     quality_score: float          # 0–1 score from aggregator
     quality_feedback: str         # Human-readable gaps / suggestions
     revision_count: int           # How many retry loops have run
-    human_feedback: str           # Feedback entered at HITL node
+    human_feedback: str           # Combined feedback string (used by classify_feedback)
     feedback_type: str            # "approve" | "actionable" | "irrelevant" — set by classify_feedback
+
+    # ── Per-document feedback (set by UI, consumed by generation nodes) ────────
+    resume_feedback: str          # Specific feedback for the tailored resume
+    cover_letter_feedback: str    # Specific feedback for the cover letter
+    interview_feedback: str       # Specific feedback for the interview prep guide
 
     # ── Accumulate log messages across all nodes ───────────────────────────────
     messages: Annotated[list[str], operator.add]

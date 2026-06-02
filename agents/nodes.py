@@ -209,13 +209,20 @@ def analyze_jd(state: AgentState) -> dict:
 def tailor_resume(state: AgentState) -> dict:
     """
     Rewrites the candidate's resume to match the JD — no fabrication.
+    Skips regeneration when no resume-specific feedback is provided and content already exists.
     """
+    resume_fb = state.get("resume_feedback", "").strip()
+    existing  = state.get("tailored_resume", "").strip()
+
+    if not resume_fb and existing:
+        return {"messages": ["📄 Resume unchanged (no specific feedback)."]}
+
     llm = get_llm(temperature=0.4)
 
-    human_feedback = state.get("human_feedback", "")
+    feedback = resume_fb or state.get("human_feedback", "")
     feedback_section = (
-        f"\n\nPrevious feedback to incorporate:\n{human_feedback}"
-        if human_feedback else ""
+        f"\n\nFeedback to incorporate:\n{feedback}"
+        if feedback else ""
     )
 
     # Use sanitized_resume (PII redacted) for the LLM call; restore real
@@ -248,11 +255,11 @@ def tailor_resume(state: AgentState) -> dict:
         ))
     ])
 
-    # Restore real PII values (email, phone, etc.) in the final document
     final_resume = restore_pii(response.content, mapping)
 
     return {
         "tailored_resume": final_resume,
+        "resume_feedback": "",  # clear after use
         "messages": ["📄 Resume tailored for the role."]
     }
 
@@ -264,16 +271,23 @@ def tailor_resume(state: AgentState) -> dict:
 def write_cover_letter(state: AgentState) -> dict:
     """
     Generates a personalised, tone-matched cover letter.
+    Skips regeneration when no cover-letter-specific feedback is provided and content already exists.
     """
+    cover_fb = state.get("cover_letter_feedback", "").strip()
+    existing = state.get("cover_letter", "").strip()
+
+    if not cover_fb and existing:
+        return {"messages": ["✉️ Cover letter unchanged (no specific feedback)."]}
+
     llm = get_llm(temperature=0.6)
 
-    tone = state.get("jd_analysis", {}).get("tone", "professional")
+    tone    = state.get("jd_analysis", {}).get("tone", "professional")
     company = state["company_name"]
 
-    human_feedback = state.get("human_feedback", "")
+    feedback = cover_fb or state.get("human_feedback", "")
     feedback_section = (
-        f"\n\nPrevious feedback to incorporate:\n{human_feedback}"
-        if human_feedback else ""
+        f"\n\nFeedback to incorporate:\n{feedback}"
+        if feedback else ""
     )
 
     # Use sanitized_resume (PII redacted) for the LLM call; restore real
@@ -305,11 +319,11 @@ def write_cover_letter(state: AgentState) -> dict:
         ))
     ])
 
-    # Restore real PII values (email, phone, etc.) in the final document
     final_letter = restore_pii(response.content, mapping)
 
     return {
         "cover_letter": final_letter,
+        "cover_letter_feedback": "",  # clear after use
         "messages": ["✉️ Cover letter written."]
     }
 
@@ -321,12 +335,23 @@ def write_cover_letter(state: AgentState) -> dict:
 def prepare_interview(state: AgentState) -> dict:
     """
     Generates technical questions, STAR behavioural Q&As, and questions to ask.
+    Skips regeneration when no interview-specific feedback is provided and content already exists.
     """
+    interview_fb = state.get("interview_feedback", "").strip()
+    existing     = state.get("interview_questions", [])
+
+    if not interview_fb and existing:
+        return {"messages": ["🎯 Interview prep unchanged (no specific feedback)."]}
+
     llm = get_llm(temperature=0.4)
     company = state["company_name"]
 
-    # Interview prep uses the sanitized resume — no PII needed in Q&A output
     sanitized = state.get("sanitized_resume") or state["resume_text"]
+
+    feedback_section = (
+        f"\n\n## Feedback to incorporate\n{interview_fb}"
+        if interview_fb else ""
+    )
 
     response = llm.invoke([
         SystemMessage(content=(
@@ -344,6 +369,7 @@ def prepare_interview(state: AgentState) -> dict:
             f"## Job Description\n{state['job_description']}\n\n"
             f"## Candidate Resume\n{sanitized}\n\n"
             f"## JD Analysis\n{json.dumps(state.get('jd_analysis', {}), indent=2)}"
+            f"{feedback_section}"
         ))
     ])
 
@@ -351,6 +377,7 @@ def prepare_interview(state: AgentState) -> dict:
 
     return {
         "interview_questions": lines,
+        "interview_feedback": "",  # clear after use
         "messages": ["🎯 Interview prep guide generated."]
     }
 

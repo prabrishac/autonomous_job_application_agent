@@ -6,7 +6,9 @@
       "Bash(python3 -c \"from autonomous_job_application_agent.main import os; print\\('KEY loaded:', bool\\(os.environ.get\\('OPENAI_API_KEY'\\)\\)\\)\")",
       "Bash(python3 -c ' *)",
       "Bash(uv --version)",
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "Bash(mkdir -p /Users/prabrisha/agentic_ai/aiengg/capstone_project/autonomous_job_application_agent/static)",
+      "Bash(uv add *)"
     ]
   }
 }
