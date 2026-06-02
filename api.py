@@ -117,12 +117,16 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
         }
 
         _push(session, {"type": "started"})
+        print(f"\n[{session_id[:8]}] 🚀 Agent started")
 
         # ── Initial run ───────────────────────────────────────────────────────
         for event in graph.stream(initial_state, config=config, stream_mode="updates"):
-            for node_name in event:
+            for node_name, updates in event.items():
                 if node_name == "__interrupt__":
                     continue
+                print(f"[{session_id[:8]}] ✓ node: {node_name}")
+                for msg in updates.get("messages", []):
+                    print(f"[{session_id[:8]}]    {msg}")
                 _push(session, {"type": "node_complete", "node": node_name})
 
         current = graph.get_state(config)
@@ -130,12 +134,16 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
 
         # ── HITL loop ─────────────────────────────────────────────────────────
         while current.next:
+            score = snapshot.get("quality_score", 0.0)
+            rev = snapshot.get("revision_count", 0)
+            print(f"[{session_id[:8]}] ⏸  awaiting feedback (score={score:.2f}, revision={rev})")
             _push(session, {"type": "awaiting_feedback", "state": _output_payload(snapshot)})
             session["status"] = "awaiting_feedback"
 
             session["feedback_ready"].wait()
             session["feedback_ready"].clear()
             session["status"] = "running"
+            print(f"[{session_id[:8]}] ▶  feedback received, resuming...")
 
             fd = session["pending_feedback"]
             if fd.get("approve"):
@@ -151,6 +159,7 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
                 if itf: parts.append(f"Interview Prep: {itf}")
                 combined = "; ".join(parts) if parts else "approve"
 
+            print(f"[{session_id[:8]}]    feedback: {combined[:120]}")
             graph.update_state(config, {
                 "human_feedback": combined,
                 "resume_feedback": rf if not fd.get("approve") else "",
@@ -159,22 +168,28 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
             })
 
             for event in graph.stream(None, config=config, stream_mode="updates"):
-                for node_name in event:
+                for node_name, updates in event.items():
                     if node_name == "__interrupt__":
                         continue
+                    print(f"[{session_id[:8]}] ✓ node: {node_name}")
+                    for msg in updates.get("messages", []):
+                        print(f"[{session_id[:8]}]    {msg}")
                     _push(session, {"type": "node_complete", "node": node_name})
 
             current = graph.get_state(config)
             snapshot = dict(current.values)
 
         # ── Completed ─────────────────────────────────────────────────────────
+        print(f"[{session_id[:8]}] ✅ Completed — exporting documents")
         _push(session, {"type": "completed", "state": _output_payload(snapshot)})
         session["status"] = "completed"
 
     except PIIBlockedError as exc:
+        print(f"[{session_id[:8]}] 🚫 BLOCKED — PII detected: {exc}")
         _push(session, {"type": "error", "message": f"Sensitive PII detected in resume: {exc}"})
         session["status"] = "error"
     except Exception as exc:
+        print(f"[{session_id[:8]}] ❌ ERROR — {exc}")
         _push(session, {"type": "error", "message": str(exc), "detail": traceback.format_exc()})
         session["status"] = "error"
 

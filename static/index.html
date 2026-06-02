@@ -630,12 +630,13 @@
     if (!jd || !resume) { toast('Please fill in both the job description and resume.', 'err'); return; }
 
     setSubmitBusy(true);
-    resetOutputSection();
-    showProgress(true);
-    initSteps();
-    setStatus('Submitting…');
 
     try {
+      resetOutputSection();
+      showProgress(true);
+      initSteps();
+      setStatus('Submitting…');
+
       const res = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -841,19 +842,13 @@
 
   /* ── UI helpers ─────────────────────────────────────────────────────────── */
   function enableFeedback(on) {
-    ['fbResume','fbCover','fbInterview'].forEach(id => {
-      document.getElementById(id).disabled = !on;
-    });
-    ['fbResumeBtn','fbCoverBtn','fbInterviewBtn'].forEach(id => {
-      document.getElementById(id).disabled = !on;
-    });
+    ['fbResume','fbCover','fbInterview'].forEach(id => _set(id, 'disabled', !on));
+    ['fbResumeBtn','fbCoverBtn','fbInterviewBtn'].forEach(id => _set(id, 'disabled', !on));
     document.getElementById('approveBtn').disabled = !on;
   }
 
   function clearFeedbackFields() {
-    ['fbResume','fbCover','fbInterview'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    ['fbResume','fbCover','fbInterview'].forEach(id => _set(id, 'value', ''));
   }
 
   function setCompleted() {
@@ -861,11 +856,21 @@
     document.getElementById('approveBtn').classList.add('hidden');
     document.getElementById('completedStrip').classList.remove('hidden');
     setSubmitBusy(false);
-    // Add "Completed" label to each card's feedback section
+    // Hide feedback controls and show a "Finalised" banner — do NOT replace
+    // the card-feedback HTML so the textareas/buttons remain in the DOM and
+    // can be restored when the user starts a new application.
     ['resumeCard','coverCard','interviewCard'].forEach(id => {
       const card = document.getElementById(id);
-      const fb   = card.querySelector('.card-feedback');
-      fb.innerHTML = '<div class="completed-banner">✅ Finalised</div>';
+      card.querySelector('.card-feedback').classList.add('hidden');
+      let banner = card.querySelector('.completed-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.className = 'completed-banner';
+        banner.textContent = '✅ Finalised';
+        card.appendChild(banner);
+      } else {
+        banner.classList.remove('hidden');
+      }
     });
   }
 
@@ -876,6 +881,12 @@
   function setSubmitBusy(busy) {
     document.getElementById('submitBtn').disabled = busy;
   }
+
+  /* null-safe wrappers used by enableFeedback / clearFeedbackFields so
+     that DOM elements destroyed by a previous setCompleted() call never
+     cause a TypeError that freezes the UI */
+  function _el(id) { return document.getElementById(id); }
+  function _set(id, prop, val) { const e = _el(id); if (e) e[prop] = val; }
 
   function showProgress(on) {
     document.getElementById('progressPanel').classList.toggle('visible', on);
@@ -895,10 +906,13 @@
     });
     clearFeedbackFields();
     enableFeedback(false);
-    // Restore feedback sections in case they were replaced
+    // Restore feedback sections that setCompleted() hid, and hide banners
     ['resumeCard','coverCard','interviewCard'].forEach(id => {
-      const card = document.getElementById(id);
-      // re-enable textareas if they were replaced
+      const card   = document.getElementById(id);
+      const fb     = card.querySelector('.card-feedback');
+      const banner = card.querySelector('.completed-banner');
+      if (fb)     fb.classList.remove('hidden');
+      if (banner) banner.classList.add('hidden');
     });
   }
 

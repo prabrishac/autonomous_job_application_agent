@@ -21,6 +21,7 @@ from autonomous_job_application_agent.guardrails.pii_guard import (
     scan_pii,
     redact_pii,
     restore_pii,
+    strip_stray_pii_tokens,
     sanitize_log,
     assert_no_sensitive_pii,
     PIIBlockedError,
@@ -242,8 +243,10 @@ def tailor_resume(state: AgentState) -> dict:
             "4. Do NOT fabricate experience, companies, or skills.\n"
             "5. Output in clean markdown format.\n"
             "6. Preserve all real experience — only reframe it.\n"
-            "7. Keep any [PII:*] placeholder tokens exactly as-is — they will be "
-            "replaced with real contact details after your response."
+            "7. The resume text may contain tokens like [PII:PHONE:abc12345]. "
+            "Copy those tokens exactly as they appear — do NOT invent new [PII:*] tokens "
+            "and do NOT use [PII:TYPE] shorthand without the hex ID. "
+            "The tokens will be replaced with real contact details after your response."
         )),
         HumanMessage(content=(
             f"## Original Resume\n{sanitized}\n\n"
@@ -255,7 +258,7 @@ def tailor_resume(state: AgentState) -> dict:
         ))
     ])
 
-    final_resume = restore_pii(response.content, mapping)
+    final_resume = strip_stray_pii_tokens(restore_pii(response.content, mapping))
 
     return {
         "tailored_resume": final_resume,
@@ -306,8 +309,10 @@ def write_cover_letter(state: AgentState) -> dict:
             "5. Total length: 3-4 paragraphs, under 350 words.\n"
             "6. NO clichés: avoid 'I am writing to express', 'passion for', 'team player'.\n"
             "7. Output in clean markdown.\n"
-            "8. Keep any [PII:*] placeholder tokens exactly as-is — they will be "
-            "replaced with real contact details after your response."
+            "8. The resume text may contain tokens like [PII:PHONE:abc12345]. "
+            "Copy those tokens exactly as they appear — do NOT invent new [PII:*] tokens "
+            "and do NOT use [PII:TYPE] shorthand without the hex ID. "
+            "The tokens will be replaced with real contact details after your response."
         )),
         HumanMessage(content=(
             f"## Target Company: {company}\n\n"
@@ -319,7 +324,7 @@ def write_cover_letter(state: AgentState) -> dict:
         ))
     ])
 
-    final_letter = restore_pii(response.content, mapping)
+    final_letter = strip_stray_pii_tokens(restore_pii(response.content, mapping))
 
     return {
         "cover_letter": final_letter,

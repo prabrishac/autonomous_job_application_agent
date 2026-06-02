@@ -153,6 +153,20 @@ def restore_pii(text: str, mapping: dict[str, str]) -> str:
     return text
 
 
+# Matches any leftover [PII:...] token the LLM may have invented (no uid suffix)
+_STRAY_PII_TOKEN = re.compile(r"\[PII:[A-Z_]+(?::[a-f0-9]+)?\]")
+
+
+def strip_stray_pii_tokens(text: str) -> str:
+    """
+    Remove any ``[PII:*]`` tokens that were not in the mapping and therefore
+    not restored by restore_pii().  These are hallucinated tokens the LLM
+    invented; stripping them is safer than leaving the literal placeholder text
+    in the final document.
+    """
+    return _STRAY_PII_TOKEN.sub("", text)
+
+
 def sanitize_log(text: str) -> str:
     """
     One-way redaction for log messages — replaces PII with ``[REDACTED:TYPE]``.
