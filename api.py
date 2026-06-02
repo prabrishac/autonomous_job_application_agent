@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from autonomous_job_application_agent.graph import build_graph
 from autonomous_job_application_agent.state import AgentState
 from autonomous_job_application_agent.guardrails.pii_guard import PIIBlockedError
+from autonomous_job_application_agent.utils.pdf_export import build_pdf
 
 app = FastAPI(title="Autonomous Job Application Agent")
 
@@ -55,6 +56,12 @@ class FeedbackRequest(BaseModel):
     cover_letter_feedback: str = ""
     interview_feedback: str = ""
     approve: bool = False
+
+
+class ExportPDFRequest(BaseModel):
+    title: str
+    content: str
+    filename: str = "document.pdf"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -254,3 +261,25 @@ async def submit_feedback(session_id: str, req: FeedbackRequest):
     session["feedback_ready"].set()
 
     return {"status": "feedback_received"}
+
+
+@app.post("/api/export-pdf")
+async def export_pdf(req: ExportPDFRequest):
+    """
+    Generate a PDF from markdown *content* and stream it back for download.
+    The client already holds the document text, so no session look-up is needed.
+    """
+    if not req.content.strip():
+        raise HTTPException(status_code=400, detail="Content is empty.")
+
+    pdf_bytes = build_pdf(req.title, req.content)
+
+    safe_name = req.filename.replace('"', "").replace("/", "_") or "document.pdf"
+    if not safe_name.endswith(".pdf"):
+        safe_name += ".pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+    )

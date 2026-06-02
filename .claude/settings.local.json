@@ -8,7 +8,13 @@
       "Bash(uv --version)",
       "Bash(uv run *)",
       "Bash(mkdir -p /Users/prabrisha/agentic_ai/aiengg/capstone_project/autonomous_job_application_agent/static)",
-      "Bash(uv add *)"
+      "Bash(uv add *)",
+      "Bash(python3 -c \"import fpdf\")",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python3 -c ' *)",
+      "Bash(.venv/bin/python3 -m pip install -e . -q)",
+      "Bash(uv sync *)",
+      "Bash(/Users/prabrisha/agentic_ai/aiengg/capstone_project/.venv/bin/pip install *)"
     ]
   }
 }

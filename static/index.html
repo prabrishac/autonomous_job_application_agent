@@ -290,9 +290,8 @@
     .card-title    { font-size: .9rem; font-weight: 700; color: var(--gray-800); }
     .card-subtitle { font-size: .73rem; color: var(--gray-400); }
 
-    /* copy button */
-    .copy-btn {
-      margin-left: auto;
+    /* copy / export buttons */
+    .copy-btn, .export-btn {
       background: transparent;
       border: 1px solid var(--gray-200);
       border-radius: 6px;
@@ -301,9 +300,15 @@
       color: var(--gray-500);
       cursor: pointer;
       transition: all .15s;
+      white-space: nowrap;
     }
-    .copy-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .copy-btn  { margin-left: auto; }
+    .export-btn { margin-left: 6px; }
+    .copy-btn:hover  { border-color: var(--primary); color: var(--primary); }
     .copy-btn.copied { border-color: var(--success); color: var(--success); }
+    .export-btn:hover    { border-color: #ef4444; color: #ef4444; }
+    .export-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .export-btn.exporting { border-color: var(--warning); color: var(--warning); }
 
     .card-doc {
       flex: 1;
@@ -496,6 +501,7 @@
             <div class="card-subtitle">Rewritten to match this role</div>
           </div>
           <button class="copy-btn" onclick="copyDoc('resumeDoc', this)" title="Copy to clipboard">Copy</button>
+          <button class="export-btn" id="exportResumeBtn" onclick="exportPDF('resumeDoc', 'Tailored Resume', 'tailored_resume.pdf', this)" title="Export as PDF" disabled>&#8595; PDF</button>
         </div>
         <div class="card-doc">
           <pre class="doc-pre" id="resumeDoc"><span class="placeholder-text">Waiting for generation…</span></pre>
@@ -519,6 +525,7 @@
             <div class="card-subtitle">Personalised for the company</div>
           </div>
           <button class="copy-btn" onclick="copyDoc('coverDoc', this)" title="Copy to clipboard">Copy</button>
+          <button class="export-btn" id="exportCoverBtn" onclick="exportPDF('coverDoc', 'Cover Letter', 'cover_letter.pdf', this)" title="Export as PDF" disabled>&#8595; PDF</button>
         </div>
         <div class="card-doc">
           <pre class="doc-pre" id="coverDoc"><span class="placeholder-text">Waiting for generation…</span></pre>
@@ -542,6 +549,7 @@
             <div class="card-subtitle">Questions, answers &amp; tips</div>
           </div>
           <button class="copy-btn" onclick="copyDoc('interviewDoc', this)" title="Copy to clipboard">Copy</button>
+          <button class="export-btn" id="exportInterviewBtn" onclick="exportPDF('interviewDoc', 'Interview Preparation Guide', 'interview_prep.pdf', this)" title="Export as PDF" disabled>&#8595; PDF</button>
         </div>
         <div class="card-doc">
           <pre class="doc-pre" id="interviewDoc"><span class="placeholder-text">Waiting for generation…</span></pre>
@@ -741,6 +749,11 @@
     setDoc('resumeDoc',    state.tailored_resume);
     setDoc('coverDoc',     state.cover_letter);
     setDoc('interviewDoc', state.interview_questions);
+
+    // Enable PDF export for whichever documents have content
+    _set('exportResumeBtn',    'disabled', !(state.tailored_resume    || '').trim());
+    _set('exportCoverBtn',     'disabled', !(state.cover_letter       || '').trim());
+    _set('exportInterviewBtn', 'disabled', !(state.interview_questions|| '').trim());
   }
 
   function setDoc(id, text) {
@@ -906,6 +919,7 @@
     });
     clearFeedbackFields();
     enableFeedback(false);
+    setExportButtons(false);
     // Restore feedback sections that setCompleted() hid, and hide banners
     ['resumeCard','coverCard','interviewCard'].forEach(id => {
       const card   = document.getElementById(id);
@@ -936,6 +950,54 @@
       btn.textContent = 'Copied!';
       btn.classList.add('copied');
       setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  /* ── Export as PDF ──────────────────────────────────────────────────────── */
+  async function exportPDF(docId, title, filename, btn) {
+    const content = document.getElementById(docId).textContent.trim();
+    if (!content || content.startsWith('Waiting for') || content.startsWith('Not yet')) {
+      toast('Document not yet generated.', 'err');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.classList.add('exporting');
+    btn.textContent = 'Generating…';
+
+    try {
+      const res = await fetch('/api/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content, filename }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.detail || 'PDF export failed');
+      }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast(`${title} exported as PDF.`, 'ok');
+    } catch (err) {
+      toast(err.message, 'err');
+    } finally {
+      btn.classList.remove('exporting');
+      btn.textContent = '↓ PDF';
+      btn.disabled = false;
+    }
+  }
+
+  /* Enable / disable all three PDF export buttons */
+  function setExportButtons(enabled) {
+    ['exportResumeBtn', 'exportCoverBtn', 'exportInterviewBtn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !enabled;
     });
   }
 
