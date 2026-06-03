@@ -175,6 +175,8 @@ def main():
         "tailored_resume": "",
         "cover_letter": "",
         "interview_questions": [],
+        "tailored_resume_sanitized": "",
+        "cover_letter_sanitized": "",
         "quality_score": 0.0,
         "quality_feedback": "",
         "revision_count": 0,

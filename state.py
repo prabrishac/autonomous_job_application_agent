@@ -23,9 +23,16 @@ class AgentState(TypedDict):
     jd_analysis: dict             # Structured: {skills, keywords, tone, requirements}
 
     # ── Generated documents ───────────────────────────────────────────────────
-    tailored_resume: str          # Rewritten resume sections optimised for this JD
-    cover_letter: str             # Full cover letter draft
+    tailored_resume: str          # Rewritten resume sections optimised for this JD (PII restored)
+    cover_letter: str             # Full cover letter draft (PII restored)
     interview_questions: list[str]  # Predicted interview Q&A pairs
+
+    # ── Sanitized copies of generated docs (PII still tokenized) ──────────────
+    # The raw LLM output before restore_pii(). Fed back into the generation nodes
+    # on revision so the LLM can revise its own previous draft without ever
+    # seeing real contact details.
+    tailored_resume_sanitized: str
+    cover_letter_sanitized: str
 
     # ── Quality & control ─────────────────────────────────────────────────────
     quality_score: float          # 0–1 score from aggregator

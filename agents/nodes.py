@@ -231,6 +231,15 @@ def tailor_resume(state: AgentState) -> dict:
     sanitized = state.get("sanitized_resume") or state["resume_text"]
     mapping = state.get("pii_mapping", {})
 
+    # On revision, give the LLM its own previous draft to edit so the feedback
+    # (which refers to that draft) has a referent. Use the sanitized copy — the
+    # raw tokenized output before restore_pii() — so no real PII reaches the LLM.
+    previous_sanitized = state.get("tailored_resume_sanitized", "").strip()
+    previous_section = (
+        f"\n\n## Your Previous Draft (revise THIS to address the feedback)\n{previous_sanitized}"
+        if previous_sanitized and feedback else ""
+    )
+
     response = llm.invoke([
         SystemMessage(content=(
             "You are an expert resume writer and career coach. "
@@ -246,7 +255,10 @@ def tailor_resume(state: AgentState) -> dict:
             "7. The resume text may contain tokens like [PII:PHONE:abc12345]. "
             "Copy those tokens exactly as they appear — do NOT invent new [PII:*] tokens "
             "and do NOT use [PII:TYPE] shorthand without the hex ID. "
-            "The tokens will be replaced with real contact details after your response."
+            "The tokens will be replaced with real contact details after your response.\n"
+            "8. If a previous draft is provided, revise THAT draft to address the "
+            "feedback rather than starting from scratch — keep everything the "
+            "feedback does not ask you to change."
         )),
         HumanMessage(content=(
             f"## Original Resume\n{sanitized}\n\n"
@@ -254,6 +266,7 @@ def tailor_resume(state: AgentState) -> dict:
             f"## Key Skills & Keywords to Include\n"
             f"{json.dumps(state.get('jd_analysis', {}), indent=2)}\n\n"
             f"## Company Research\n{state.get('company_research', '')}"
+            f"{previous_section}"
             f"{feedback_section}"
         ))
     ])
@@ -262,6 +275,7 @@ def tailor_resume(state: AgentState) -> dict:
 
     return {
         "tailored_resume": final_resume,
+        "tailored_resume_sanitized": response.content,  # keep tokenized copy for next revision
         "resume_feedback": "",  # clear after use
         "messages": ["📄 Resume tailored for the role."]
     }
@@ -298,6 +312,14 @@ def write_cover_letter(state: AgentState) -> dict:
     sanitized = state.get("sanitized_resume") or state["resume_text"]
     mapping = state.get("pii_mapping", {})
 
+    # On revision, give the LLM its own previous draft to edit so the feedback
+    # has a referent. Use the sanitized copy (pre-restore_pii) — no real PII.
+    previous_sanitized = state.get("cover_letter_sanitized", "").strip()
+    previous_section = (
+        f"\n\n## Your Previous Draft (revise THIS to address the feedback)\n{previous_sanitized}"
+        if previous_sanitized and feedback else ""
+    )
+
     response = llm.invoke([
         SystemMessage(content=(
             f"You are an expert cover letter writer. Write in a {tone} tone.\n"
@@ -312,7 +334,10 @@ def write_cover_letter(state: AgentState) -> dict:
             "8. The resume text may contain tokens like [PII:PHONE:abc12345]. "
             "Copy those tokens exactly as they appear — do NOT invent new [PII:*] tokens "
             "and do NOT use [PII:TYPE] shorthand without the hex ID. "
-            "The tokens will be replaced with real contact details after your response."
+            "The tokens will be replaced with real contact details after your response.\n"
+            "9. If a previous draft is provided, revise THAT draft to address the "
+            "feedback rather than starting from scratch — keep everything the "
+            "feedback does not ask you to change."
         )),
         HumanMessage(content=(
             f"## Target Company: {company}\n\n"
@@ -320,6 +345,7 @@ def write_cover_letter(state: AgentState) -> dict:
             f"## Job Description\n{state['job_description']}\n\n"
             f"## Candidate Resume\n{sanitized}\n\n"
             f"## JD Analysis\n{json.dumps(state.get('jd_analysis', {}), indent=2)}"
+            f"{previous_section}"
             f"{feedback_section}"
         ))
     ])
@@ -328,6 +354,7 @@ def write_cover_letter(state: AgentState) -> dict:
 
     return {
         "cover_letter": final_letter,
+        "cover_letter_sanitized": response.content,  # keep tokenized copy for next revision
         "cover_letter_feedback": "",  # clear after use
         "messages": ["✉️ Cover letter written."]
     }
@@ -358,6 +385,15 @@ def prepare_interview(state: AgentState) -> dict:
         if interview_fb else ""
     )
 
+    # On revision, give the LLM its own previous guide to edit so the feedback
+    # has a referent. interview_questions is never PII-restored, so it is safe
+    # to feed back as-is.
+    previous_guide = "\n".join(existing).strip() if existing else ""
+    previous_section = (
+        f"\n\n## Your Previous Guide (revise THIS to address the feedback)\n{previous_guide}"
+        if previous_guide and interview_fb else ""
+    )
+
     response = llm.invoke([
         SystemMessage(content=(
             "You are a senior interview coach. Generate a targeted interview prep guide.\n"
@@ -366,7 +402,10 @@ def prepare_interview(state: AgentState) -> dict:
             "## Behavioural Questions (5 STAR-format Q&As based on the candidate's real experience)\n"
             "## Culture-Fit Questions (3 questions linking to company values)\n"
             "## Questions to Ask the Interviewer (5 smart, specific questions)\n\n"
-            "Base STAR answers ONLY on the candidate's actual resume — no fabrication."
+            "Base STAR answers ONLY on the candidate's actual resume — no fabrication.\n"
+            "If a previous guide is provided, revise THAT guide to address the "
+            "feedback rather than starting from scratch — keep everything the "
+            "feedback does not ask you to change."
         )),
         HumanMessage(content=(
             f"## Company: {company}\n\n"
@@ -374,6 +413,7 @@ def prepare_interview(state: AgentState) -> dict:
             f"## Job Description\n{state['job_description']}\n\n"
             f"## Candidate Resume\n{sanitized}\n\n"
             f"## JD Analysis\n{json.dumps(state.get('jd_analysis', {}), indent=2)}"
+            f"{previous_section}"
             f"{feedback_section}"
         ))
     ])
