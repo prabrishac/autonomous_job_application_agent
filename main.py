@@ -180,6 +180,7 @@ def main():
         "revision_count": 0,
         "human_feedback": "",
         "feedback_type": "",
+        "approved": False,
         "resume_feedback": "",
         "cover_letter_feedback": "",
         "interview_feedback": "",

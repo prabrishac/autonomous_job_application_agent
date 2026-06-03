@@ -118,6 +118,7 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
             "revision_count": 0,
             "human_feedback": "",
             "feedback_type": "",
+            "approved": False,
             "resume_feedback": "",
             "cover_letter_feedback": "",
             "interview_feedback": "",
@@ -154,9 +155,14 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
             print(f"[{session_id[:8]}] ▶  feedback received, resuming...")
 
             fd = session["pending_feedback"]
-            if fd.get("approve"):
-                combined = "approve"
+            is_approved = bool(fd.get("approve"))
+
+            if is_approved:
+                # Explicit approval — finalise via the approved flag, NOT by
+                # passing "approve" as feedback text (which classify_feedback
+                # could misread on a per-document message).
                 rf, cf, itf = "", "", ""
+                combined = "approve"
             else:
                 rf  = fd.get("resume_feedback", "").strip()
                 cf  = fd.get("cover_letter_feedback", "").strip()
@@ -165,14 +171,15 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
                 if rf:  parts.append(f"Resume: {rf}")
                 if cf:  parts.append(f"Cover Letter: {cf}")
                 if itf: parts.append(f"Interview Prep: {itf}")
-                combined = "; ".join(parts) if parts else "approve"
+                combined = "; ".join(parts)   # may be "" — handled as irrelevant
 
-            print(f"[{session_id[:8]}]    feedback: {combined[:120]}")
+            print(f"[{session_id[:8]}]    approve={is_approved} feedback: {combined[:120]}")
             graph.update_state(config, {
+                "approved": is_approved,
                 "human_feedback": combined,
-                "resume_feedback": rf if not fd.get("approve") else "",
-                "cover_letter_feedback": cf if not fd.get("approve") else "",
-                "interview_feedback": itf if not fd.get("approve") else "",
+                "resume_feedback": rf,
+                "cover_letter_feedback": cf,
+                "interview_feedback": itf,
             })
 
             for event in graph.stream(None, config=config, stream_mode="updates"):

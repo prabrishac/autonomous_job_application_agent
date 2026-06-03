@@ -475,9 +475,44 @@ _APPROVAL_KEYWORDS = frozenset(
 
 def classify_feedback(state: AgentState) -> dict:
     """
-    Classify human_feedback and set feedback_type in state.
-    Increments revision_count only on actionable feedback.
+    Decide what happens after human review and set feedback_type in state.
+
+    Priority order — deterministic signals first, LLM text-classification last:
+
+      1. Explicit approval  — the UI's Approve action sets state["approved"].
+         This is the ONLY way UI feedback can finish the graph, so feedback on a
+         single document can never accidentally approve all three.
+      2. Targeted feedback  — any per-document feedback field is set → actionable;
+         the generation nodes regenerate only the documents that have feedback.
+      3. Free-form feedback — (CLI path) classify the raw message via keyword /
+         LLM into approve / actionable / irrelevant.
+
+    revision_count is incremented only on actionable feedback.
     """
+    # ── 1. Explicit approval flag from the UI ─────────────────────────────────
+    if state.get("approved"):
+        return {
+            "feedback_type": "approve",
+            "approved": False,   # consume the flag
+            "messages": ["✅ All documents approved by user."],
+        }
+
+    # ── 2. Targeted per-document feedback from the UI ─────────────────────────
+    targeted = [
+        name for name, fb in (
+            ("resume",         state.get("resume_feedback", "").strip()),
+            ("cover letter",   state.get("cover_letter_feedback", "").strip()),
+            ("interview prep", state.get("interview_feedback", "").strip()),
+        ) if fb
+    ]
+    if targeted:
+        return {
+            "feedback_type": "actionable",
+            "revision_count": state.get("revision_count", 0) + 1,
+            "messages": [f"✏️  Actionable feedback — regenerating: {', '.join(targeted)}."],
+        }
+
+    # ── 3. Free-form feedback (CLI) ───────────────────────────────────────────
     feedback = state.get("human_feedback", "").strip()
 
     # ── Fast path: explicit approval keyword ──────────────────────────────────

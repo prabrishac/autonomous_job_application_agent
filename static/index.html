@@ -446,6 +446,31 @@
       margin-left: auto;
     }
 
+    /* ── Per-card approval state ─────────────────────────────────────────── */
+    .out-card.card-approved {
+      box-shadow: 0 0 0 2px var(--success), var(--shadow);
+    }
+    .out-card.card-approved .card-feedback {
+      background: #ecfdf5;
+    }
+    /* Solid green when un-approved → click to approve */
+    .btn-approve-card {
+      background: var(--success);
+      color: #fff;
+    }
+    .btn-approve-card:not(:disabled):hover {
+      background: #059669;
+    }
+    /* Lighter pill once approved → click to undo */
+    .btn-approve-card.is-approved {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #6ee7b7;
+    }
+    .btn-approve-card.is-approved:not(:disabled):hover {
+      background: #a7f3d0;
+    }
+
     /* ── Approve banner ──────────────────────────────────────────────────── */
     .approve-strip {
       display: flex;
@@ -648,7 +673,8 @@
           <textarea class="fb-ta" id="fbResume" placeholder="e.g. Emphasise Python more, shorten summary, add Kafka keyword…" disabled></textarea>
           <div class="fb-actions">
             <button class="btn btn-outline btn-sm" id="fbResumeBtn" onclick="sendFeedback('resume')" disabled>Regenerate Resume</button>
-            <span class="fb-hint">Only this document is regenerated</span>
+            <button class="btn btn-approve-card btn-sm" id="approveResumeBtn" onclick="approveOne('resume')" disabled>✓ Approve</button>
+            <span class="fb-hint">Regenerate, or approve this document</span>
           </div>
         </div>
       </div>
@@ -672,7 +698,8 @@
           <textarea class="fb-ta" id="fbCover" placeholder="e.g. Make it shorter, add a specific project, adjust tone…" disabled></textarea>
           <div class="fb-actions">
             <button class="btn btn-outline btn-sm" id="fbCoverBtn" onclick="sendFeedback('cover')" disabled>Regenerate Cover Letter</button>
-            <span class="fb-hint">Only this document is regenerated</span>
+            <button class="btn btn-approve-card btn-sm" id="approveCoverBtn" onclick="approveOne('cover')" disabled>✓ Approve</button>
+            <span class="fb-hint">Regenerate, or approve this document</span>
           </div>
         </div>
       </div>
@@ -696,7 +723,8 @@
           <textarea class="fb-ta" id="fbInterview" placeholder="e.g. Add more system-design Qs, focus on leadership, STAR examples…" disabled></textarea>
           <div class="fb-actions">
             <button class="btn btn-outline btn-sm" id="fbInterviewBtn" onclick="sendFeedback('interview')" disabled>Regenerate Interview Prep</button>
-            <span class="fb-hint">Only this document is regenerated</span>
+            <button class="btn btn-approve-card btn-sm" id="approveInterviewBtn" onclick="approveOne('interview')" disabled>✓ Approve</button>
+            <span class="fb-hint">Regenerate, or approve this document</span>
           </div>
         </div>
       </div>
@@ -735,6 +763,10 @@
   let cursor      = 0;
   let pollTimer   = null;
   let stepStates  = {};   // node_id → 'idle' | 'active' | 'done' | 'error'
+
+  // Per-document approval state (frontend-only until ALL three are approved,
+  // at which point the graph is finalised via the approve:true endpoint).
+  let approved = { resume: false, cover: false, interview: false };
 
   /* ── Step tracker ──────────────────────────────────────────────────────── */
   function initSteps() {
@@ -958,6 +990,7 @@
         markDone('aggregate_outputs');
         showOutputSection(ev.state);
         enableFeedback(true);
+        applyApprovalLocks();   // keep previously-approved cards locked
         if (ev.state.feedback_type === 'irrelevant') {
           setIrrelevantWarning(true);
           setStatus('Feedback not actionable — please provide more specific instructions.');
@@ -1028,10 +1061,16 @@
 
   // Maps card type → { textarea id, api field, graph node, label }
   const CARD_META = {
-    resume:    { ta: 'fbResume',    btn: 'fbResumeBtn',    field: 'resume_feedback',         node: 'tailor_resume',      label: 'Resume'          },
-    cover:     { ta: 'fbCover',     btn: 'fbCoverBtn',     field: 'cover_letter_feedback',   node: 'write_cover_letter', label: 'Cover Letter'    },
-    interview: { ta: 'fbInterview', btn: 'fbInterviewBtn', field: 'interview_feedback',      node: 'prepare_interview',  label: 'Interview Prep'  },
+    resume:    { ta: 'fbResume',    btn: 'fbResumeBtn',    approveBtn: 'approveResumeBtn',    card: 'resumeCard',    field: 'resume_feedback',       node: 'tailor_resume',      label: 'Resume'          },
+    cover:     { ta: 'fbCover',     btn: 'fbCoverBtn',     approveBtn: 'approveCoverBtn',     card: 'coverCard',     field: 'cover_letter_feedback', node: 'write_cover_letter', label: 'Cover Letter'    },
+    interview: { ta: 'fbInterview', btn: 'fbInterviewBtn', approveBtn: 'approveInterviewBtn', card: 'interviewCard', field: 'interview_feedback',    node: 'prepare_interview',  label: 'Interview Prep'  },
   };
+
+  // Words that mean "approve" — typed into a Regenerate box these used to
+  // finalise everything, so we intercept them and point at the Approve button.
+  const APPROVAL_WORDS = new Set(
+    ['approve','approved','ok','okay','looks good','lgtm','yes','y','done','perfect','fine','good','great']
+  );
 
   async function sendFeedback(type) {
     if (!sessionId) return;
@@ -1040,6 +1079,13 @@
 
     if (!feedback) {
       toast(`Enter feedback for ${meta.label} first.`, 'err');
+      return;
+    }
+
+    // Typing "approve" into a Regenerate box used to finalise ALL documents.
+    // Redirect the user to the per-card Approve button instead.
+    if (APPROVAL_WORDS.has(feedback.toLowerCase())) {
+      toast(`To approve ${meta.label}, click its "✓ Approve" button.`, 'err');
       return;
     }
 
@@ -1077,8 +1123,67 @@
     }
   }
 
-  async function approveAll() {
+  /* Approve a single document. Locks the card; if it's the last one
+     outstanding, the whole application is finalised. */
+  function approveOne(type) {
     if (!sessionId) return;
+    if (approved[type]) { unApproveOne(type); return; }   // toggle off
+
+    approved[type] = true;
+    lockCard(type);
+
+    if (allApproved()) {
+      finalizeApproval();
+    } else {
+      const left = Object.keys(CARD_META).filter(t => !approved[t]).length;
+      toast(`${CARD_META[type].label} approved — ${left} document${left === 1 ? '' : 's'} left.`, 'ok');
+    }
+  }
+
+  /* Approve everything in one go. */
+  function approveAll() {
+    if (!sessionId) return;
+    Object.keys(CARD_META).forEach(t => { approved[t] = true; lockCard(t); });
+    finalizeApproval();
+  }
+
+  function allApproved() {
+    return Object.keys(CARD_META).every(t => approved[t]);
+  }
+
+  /* Lock a card: disable its feedback box + Regenerate, flip its Approve
+     button to the "Approved (click to undo)" pill. */
+  function lockCard(type) {
+    const meta = CARD_META[type];
+    _set(meta.ta, 'disabled', true);
+    _set(meta.btn, 'disabled', true);
+    const ab = _el(meta.approveBtn);
+    if (ab) { ab.textContent = '✓ Approved'; ab.title = 'Click to undo'; ab.classList.add('is-approved'); ab.disabled = false; }
+    const card = _el(meta.card);
+    if (card) card.classList.add('card-approved');
+  }
+
+  /* Undo a single approval (only possible before the final approve fires). */
+  function unApproveOne(type) {
+    approved[type] = false;
+    const meta = CARD_META[type];
+    _set(meta.ta, 'disabled', false);
+    _set(meta.btn, 'disabled', false);
+    const ab = _el(meta.approveBtn);
+    if (ab) { ab.textContent = '✓ Approve'; ab.title = ''; ab.classList.remove('is-approved'); }
+    const card = _el(meta.card);
+    if (card) card.classList.remove('card-approved');
+    toast(`${meta.label} approval removed.`, '');
+  }
+
+  /* Re-apply approval locks after a re-render (e.g. after another card is
+     regenerated and the awaiting_feedback event re-enables the controls). */
+  function applyApprovalLocks() {
+    Object.keys(CARD_META).forEach(t => { if (approved[t]) lockCard(t); });
+  }
+
+  /* Final step — tell the graph all documents are approved → routes to END. */
+  async function finalizeApproval() {
     enableFeedback(false);
     setIrrelevantWarning(false);
     document.getElementById('approveBtn').disabled = true;
@@ -1094,11 +1199,12 @@
         body: JSON.stringify({ resume_feedback: '', cover_letter_feedback: '', interview_feedback: '', approve: true }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Approve failed'); }
-      toast('Approved!', 'ok');
+      toast('All documents approved!', 'ok');
       startPolling();
     } catch (err) {
       toast(err.message, 'err');
       enableFeedback(true);
+      applyApprovalLocks();
       document.getElementById('approveBtn').disabled = false;
     }
   }
@@ -1114,8 +1220,16 @@
 
   /* ── UI helpers ─────────────────────────────────────────────────────────── */
   function enableFeedback(on) {
-    ['fbResume','fbCover','fbInterview'].forEach(id => _set(id, 'disabled', !on));
-    ['fbResumeBtn','fbCoverBtn','fbInterviewBtn'].forEach(id => _set(id, 'disabled', !on));
+    Object.keys(CARD_META).forEach(type => {
+      const meta = CARD_META[type];
+      // An already-approved card stays locked even when feedback is enabled.
+      const locked = approved[type];
+      _set(meta.ta,  'disabled', !on || locked);
+      _set(meta.btn, 'disabled', !on || locked);
+      // The Approve button itself is available whenever we're awaiting feedback
+      // (so the user can approve, or undo an approval).
+      _set(meta.approveBtn, 'disabled', !on);
+    });
     document.getElementById('approveBtn').disabled = !on;
   }
 
@@ -1176,6 +1290,12 @@
     ['resumeDoc','coverDoc','interviewDoc'].forEach(id => {
       document.getElementById(id).innerHTML = '<span class="placeholder-text">Waiting for generation…</span>';
     });
+    // Reset per-card approval state + visuals
+    approved = { resume: false, cover: false, interview: false };
+    Object.keys(CARD_META).forEach(type => {
+      const ab = _el(CARD_META[type].approveBtn);
+      if (ab) { ab.textContent = '✓ Approve'; ab.title = ''; ab.classList.remove('is-approved'); }
+    });
     clearFeedbackFields();
     enableFeedback(false);
     setExportButtons(false);
@@ -1186,6 +1306,7 @@
       const banner = card.querySelector('.completed-banner');
       if (fb)     fb.classList.remove('hidden');
       if (banner) banner.classList.add('hidden');
+      card.classList.remove('card-approved');
     });
   }
 

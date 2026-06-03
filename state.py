@@ -33,6 +33,9 @@ class AgentState(TypedDict):
     revision_count: int           # How many retry loops have run
     human_feedback: str           # Combined feedback string (used by classify_feedback)
     feedback_type: str            # "approve" | "actionable" | "irrelevant" — set by classify_feedback
+    approved: bool                # Explicit approval signal from the UI's Approve action.
+                                  # Set True ONLY when the user approves all documents; the
+                                  # sole way targeted UI feedback can finalise the graph.
 
     # ── Per-document feedback (set by UI, consumed by generation nodes) ────────
     resume_feedback: str          # Specific feedback for the tailored resume
