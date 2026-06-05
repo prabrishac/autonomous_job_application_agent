@@ -15,9 +15,9 @@ import re
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from autonomous_job_application_agent.state import AgentState
-from autonomous_job_application_agent.tools.search_tools import web_search, fetch_url
-from autonomous_job_application_agent.guardrails.pii_guard import (
+from state import AgentState
+from tools.search_tools import web_search, fetch_url
+from guardrails.pii_guard import (
     scan_pii,
     redact_pii,
     restore_pii,

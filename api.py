@@ -1,9 +1,9 @@
 """
 api.py — FastAPI server for the Autonomous Job Application Agent UI.
 
-Run from the project parent directory:
-    cd /Users/prabrisha/agentic_ai/aiengg/capstone_project
-    uvicorn autonomous_job_application_agent.api:app --reload --port 8000
+Run from the project root directory:
+    cd /Users/prabrisha/agentic_ai/aiengg/capstone_project/autonomous_job_application_agent
+    uvicorn api:app --reload --port 8000
 """
 
 import os
@@ -23,11 +23,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from autonomous_job_application_agent.graph import build_graph
-from autonomous_job_application_agent.state import AgentState
-from autonomous_job_application_agent.guardrails.pii_guard import PIIBlockedError
-from autonomous_job_application_agent.utils.pdf_export import build_pdf
-from autonomous_job_application_agent.utils.pdf_parser import extract_pdf_text
+from graph import build_graph
+from state import AgentState
+from guardrails.pii_guard import PIIBlockedError
+from utils.pdf_export import build_pdf
+from utils.pdf_parser import extract_pdf_text
 
 app = FastAPI(title="Autonomous Job Application Agent")
 

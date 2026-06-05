@@ -42,14 +42,13 @@ echo "OPENAI_API_KEY=sk-..." > .env
 
 ### Start the web server
 
-The FastAPI app is the primary entry point. Run uvicorn from the **parent
-directory** so the `autonomous_job_application_agent` package resolves:
+The FastAPI app is the primary entry point. Run uvicorn from the **project
+root directory** (`autonomous_job_application_agent`):
 
 ```bash
-cd /Users/prabrisha/agentic_ai/aiengg/capstone_project
+cd autonomous_job_application_agent
 
-uv run --project autonomous_job_application_agent \
-  uvicorn autonomous_job_application_agent.api:app --reload --port 8000
+uv run uvicorn api:app --reload --port 8000
 ```
 
 Then open <http://localhost:8000> in your browser.
@@ -62,7 +61,7 @@ A headless command-line runner with the same human-in-the-loop flow:
 
 ```bash
 cd autonomous_job_application_agent
-uv run python -m autonomous_job_application_agent.main
+uv run python main.py
 ```
 
 ### Dependency management

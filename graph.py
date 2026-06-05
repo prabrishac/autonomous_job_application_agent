@@ -14,8 +14,8 @@ Topology:
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 
-from autonomous_job_application_agent.state import AgentState
-from autonomous_job_application_agent.agents.nodes import (
+from state import AgentState
+from agents.nodes import (
     pii_guardrail,
     parse_input,
     research_company,

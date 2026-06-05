@@ -2,8 +2,8 @@
 main.py — CLI runner for the Autonomous Job Application Agent.
 
 Usage:
-    cd /Users/prabrisha/agentic_ai/aiengg/capstone_project
-    python -m autonomous_job_application_agent.main
+    cd /Users/prabrisha/agentic_ai/aiengg/capstone_project/autonomous_job_application_agent
+    python main.py
 """
 
 import json
@@ -16,9 +16,9 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-from autonomous_job_application_agent.graph import build_graph
-from autonomous_job_application_agent.state import AgentState
-from autonomous_job_application_agent.guardrails.pii_guard import PIIBlockedError
+from graph import build_graph
+from state import AgentState
+from guardrails.pii_guard import PIIBlockedError
 
 
 SAMPLE_JD = """

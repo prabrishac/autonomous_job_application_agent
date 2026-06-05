@@ -5,12 +5,12 @@ Reads the cached outputs in evals/fixtures/ (produced by `evaluate.py`) and
 asserts each metric passes its threshold. Fixtures are used rather than live
 API calls so CI is deterministic and cheap; generate/refresh them first with:
 
-    cd <project parent>
-    python -m autonomous_job_application_agent.evals.evaluate --refresh
+    cd <project root>
+    python -m evals.evaluate --refresh
 
 Then gate in CI with:
 
-    pytest autonomous_job_application_agent/evals/test_quality.py
+    pytest evals/test_quality.py
 
 deepeval's judge model still calls OpenAI, so OPENAI_API_KEY must be set.
 """
@@ -26,8 +26,8 @@ from deepeval import assert_test
 _PKG_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(_PKG_ROOT / ".env")
 
-from autonomous_job_application_agent.evals.dataset import GOLDEN_EXAMPLES
-from autonomous_job_application_agent.evals import metrics as M
+from evals.dataset import GOLDEN_EXAMPLES
+from evals import metrics as M
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures"
 

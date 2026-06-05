@@ -14,7 +14,11 @@
       "Bash(.venv/bin/python3 -c ' *)",
       "Bash(.venv/bin/python3 -m pip install -e . -q)",
       "Bash(uv sync *)",
-      "Bash(/Users/prabrisha/agentic_ai/aiengg/capstone_project/.venv/bin/pip install *)"
+      "Bash(/Users/prabrisha/agentic_ai/aiengg/capstone_project/.venv/bin/pip install *)",
+      "Bash(python3 -c \"import reportlab; import matplotlib; print\\('OK'\\)\")",
+      "Bash(pip3 list *)",
+      "Bash(pip3 install *)",
+      "Bash(python3 gen_system_design.py)"
     ]
   }
 }

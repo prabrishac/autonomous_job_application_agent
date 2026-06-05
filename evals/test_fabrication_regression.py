@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 _PKG_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(_PKG_ROOT / ".env")
 
-from autonomous_job_application_agent.evals import metrics as M
+from evals import metrics as M
 
 
 JOB_DESCRIPTION = (

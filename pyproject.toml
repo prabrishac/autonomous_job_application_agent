@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-job-agent = "autonomous_job_application_agent.main:main"
+job-agent = "main:main"
 
 [build-system]
 requires = ["hatchling"]

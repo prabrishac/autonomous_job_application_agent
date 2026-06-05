@@ -8,12 +8,12 @@ Pipeline per example:
   3. Run the deterministic PII-token leak check on the final documents.
   4. Print a scorecard and exit non-zero if any metric is below threshold.
 
-Run from the project's PARENT directory (same convention as main/api):
+Run from the project ROOT directory (same convention as main/api):
 
-    cd /Users/prabrisha/agentic_ai/aiengg/capstone_project
-    python -m autonomous_job_application_agent.evals.evaluate            # use cache
-    python -m autonomous_job_application_agent.evals.evaluate --refresh  # regenerate
-    JOB_AGENT_BASE_URL=http://localhost:8000 python -m ...evals.evaluate # live server
+    cd /Users/prabrisha/agentic_ai/aiengg/capstone_project/autonomous_job_application_agent
+    python -m evals.evaluate            # use cache
+    python -m evals.evaluate --refresh  # regenerate
+    JOB_AGENT_BASE_URL=http://localhost:8000 python -m evals.evaluate # live server
 
 Requires OPENAI_API_KEY (read from .env). deepeval's judge model also calls
 OpenAI, so a run bills both the agent and the judge.
@@ -29,9 +29,9 @@ from dotenv import load_dotenv
 _PKG_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(_PKG_ROOT / ".env")
 
-from autonomous_job_application_agent.evals.dataset import GOLDEN_EXAMPLES, Example
-from autonomous_job_application_agent.evals.api_client import generate_via_api
-from autonomous_job_application_agent.evals import metrics as M
+from evals.dataset import GOLDEN_EXAMPLES, Example
+from evals.api_client import generate_via_api
+from evals import metrics as M
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures"
 

@@ -41,7 +41,7 @@ def _client():
     else:
         # In-process: import here so a live-server run never needs the app deps.
         from starlette.testclient import TestClient
-        from autonomous_job_application_agent.api import app
+        from api import app
         with TestClient(app) as c:
             yield c
 
