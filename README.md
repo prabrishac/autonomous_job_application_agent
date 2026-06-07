@@ -131,6 +131,7 @@ autonomous_job_application_agent/
 
 ## Extension ideas
 
+- **Authentication**: add user login (OAuth / email-password) so each user has private sessions, saved resumes, and an isolated document history
 - Swap DuckDuckGo for **Tavily API** for richer search results
 - Enable **LangSmith tracing** for observability
 - Use **SQLite checkpointer** for state that survives restarts

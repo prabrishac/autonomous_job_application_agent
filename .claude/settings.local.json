@@ -18,7 +18,8 @@
       "Bash(python3 -c \"import reportlab; import matplotlib; print\\('OK'\\)\")",
       "Bash(pip3 list *)",
       "Bash(pip3 install *)",
-      "Bash(python3 gen_system_design.py)"
+      "Bash(python3 gen_system_design.py)",
+      "Bash(find /System/Library/Fonts /Library/Fonts ~/Library/Fonts -iname \"*georgia*\" -o -iname \"*book antiqua*\" -o -iname \"*palatino*\" -o -iname \"*arial*\" 2>/dev/null | sort)"
     ]
   }
 }
