@@ -85,7 +85,7 @@ def pii_guardrail(state: AgentState) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_llm(temperature: float = 0.3):
-    return ChatOpenAI(model="gpt-4o", temperature=temperature)
+    return ChatOpenAI(model="gpt-5.4-mini", temperature=temperature)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -554,7 +554,29 @@ _APPROVAL_KEYWORDS = frozenset(
 )
 
 
-def _classify_feedback_text(feedback: str) -> str:
+# What each per-document feedback box is for — lets the classifier reject
+# feedback that clearly belongs to a different document (e.g. asking for
+# "technical questions" on the cover letter).
+_DOC_DESCRIPTIONS = {
+    "resume": (
+        "The resume contains professional summary, work experience, skills, "
+        "education, achievements, and ATS keywords. It does NOT contain a cover "
+        "letter narrative or interview questions."
+    ),
+    "cover letter": (
+        "The cover letter is a personalised narrative addressed to the employer — "
+        "motivation, fit, tone, and paragraphs. It does NOT contain interview "
+        "questions or a resume-style skills list."
+    ),
+    "interview prep": (
+        "The interview prep guide contains practice interview questions "
+        "(technical and behavioural), talking points, and STAR-style answer "
+        "examples. It does NOT contain a cover letter narrative or resume sections."
+    ),
+}
+
+
+def _classify_feedback_text(feedback: str, target: str = None) -> str:
     """
     Classify a free-form feedback string into 'approve' | 'actionable' | 'irrelevant'.
 
@@ -562,6 +584,13 @@ def _classify_feedback_text(feedback: str) -> str:
     irrelevant text — including coherent but off-topic requests like
     'write python code to add 2 numbers' — is rejected regardless of where it
     was entered. Returns 'irrelevant' for anything too short or unrecognised.
+
+    `target` names the specific document the feedback was entered against
+    (e.g. 'interview prep'). It is supplied for per-document (UI) feedback so the
+    classifier judges relevance with that context — 'provide more system design
+    questions' is actionable ON the interview prep guide, but irrelevant on the
+    cover letter (a cover letter has no technical questions), and looks like a
+    generic request without knowing which box it came from.
     """
     feedback = (feedback or "").strip()
 
@@ -570,6 +599,28 @@ def _classify_feedback_text(feedback: str) -> str:
 
     if len(feedback) < 8:
         return "irrelevant"
+
+    if target:
+        desc = _DOC_DESCRIPTIONS[target]
+        context = (
+            f"The user entered this feedback specifically against the {target}.\n"
+            f"{desc}\n"
+            f"Mark it actionable ONLY if it is a reasonable instruction for changing "
+            f"the {target} (adding, removing, rewording, reordering, expanding, or "
+            f"shortening ITS content) — including phrasings like 'provide…', 'give…', "
+            f"or 'add…'.\n"
+            f"Mark it irrelevant if it is gibberish, empty of intent, off-topic, OR "
+            f"clearly belongs to a DIFFERENT document than the {target}. For example, "
+            f"'provide more system design questions' is actionable on the interview prep "
+            f"guide but irrelevant on the resume or cover letter, since those do not "
+            f"contain interview questions."
+        )
+    else:
+        context = (
+            "The KEY test for actionable: the feedback must be about changing the resume, "
+            "cover letter, or interview prep. If it asks the assistant to do anything else, "
+            "it is irrelevant."
+        )
 
     llm = get_llm(temperature=0)
     response = llm.invoke([
@@ -580,18 +631,16 @@ def _classify_feedback_text(feedback: str) -> str:
             "  approve    — user is satisfied and wants to finish "
             "(e.g. 'looks good', 'all good', 'perfect', 'send it')\n"
             "  actionable — feedback gives specific instructions for improving "
-            "THESE THREE DOCUMENTS (the resume, cover letter, or interview prep) "
+            "the resume, cover letter, or interview prep "
             "(e.g. 'add more Python keywords', 'shorten the cover letter', "
-            "'focus on leadership experience')\n"
+            "'focus on leadership experience', 'provide more system design questions')\n"
             "  irrelevant — feedback is gibberish, random characters, too vague to act on, "
             "OR is off-topic / unrelated to improving the resume, cover letter, or interview prep — "
             "even if it is a clear, well-formed instruction. This includes general requests, "
             "coding tasks, questions, or commands that have nothing to do with the documents "
             "(e.g. 'asdf', 'I don't know', 'whatever', 'hello', "
             "'write python code to add 2 numbers', 'what's the weather', 'tell me a joke')\n\n"
-            "The KEY test for actionable: the feedback must be about changing the resume, "
-            "cover letter, or interview prep. If it asks the assistant to do anything else, "
-            "it is irrelevant.\n\n"
+            f"{context}\n\n"
             "Reply with ONLY one word: approve, actionable, or irrelevant."
         )),
         HumanMessage(content=f"User feedback: {feedback}")
@@ -641,7 +690,7 @@ def classify_feedback(state: AgentState) -> dict:
         fb = state.get(field, "").strip()
         if not fb:
             continue
-        if _classify_feedback_text(fb) == "actionable":
+        if _classify_feedback_text(fb, target=name) == "actionable":
             targeted.append(name)
         else:
             rejected.append(name)
