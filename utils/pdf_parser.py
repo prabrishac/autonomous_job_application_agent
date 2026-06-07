@@ -50,8 +50,8 @@ def extract_pdf_text(data: bytes) -> tuple[str, int]:
 
     page_texts: list[str] = []
     for page in reader.pages:
-        raw = page.extract_text() or ""
-        cleaned = raw.strip()
+        raw = _extract_page_text(page)
+        cleaned = _clean_page_text(raw)
         if cleaned:
             page_texts.append(cleaned)
 
@@ -66,3 +66,34 @@ def extract_pdf_text(data: bytes) -> tuple[str, int]:
     # Collapse 3+ consecutive blank lines → 2
     combined = re.sub(r"\n{3,}", "\n\n", combined)
     return combined, len(reader.pages)
+
+
+def _extract_page_text(page) -> str:
+    """Extract one page's text, preferring the layout-preserving mode.
+
+    The default extraction mode frequently mangles text from multi-column /
+    flowed PDFs: it doubles the spaces between words and scatters individual
+    words onto their own lines, so the result looks "cropped" in the UI even
+    though every character is present.  ``extraction_mode="layout"`` keeps
+    words on their original lines with single spacing (and preserves table
+    columns).  It is newer code, so we fall back to the default mode if it
+    raises or yields nothing.
+    """
+    try:
+        text = page.extract_text(extraction_mode="layout") or ""
+    except Exception:
+        text = ""
+    if not text.strip():
+        text = page.extract_text() or ""
+    return text
+
+
+def _clean_page_text(raw: str) -> str:
+    """Trim trailing whitespace from each line and strip the page edges.
+
+    Layout mode pads lines with trailing spaces and may leave a leading
+    blank line; removing them keeps the textarea tidy without disturbing the
+    leading indentation that aligns table columns.
+    """
+    lines = [line.rstrip() for line in raw.splitlines()]
+    return "\n".join(lines).strip()

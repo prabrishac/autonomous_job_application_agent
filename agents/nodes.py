@@ -207,6 +207,40 @@ def analyze_jd(state: AgentState) -> dict:
 # NODE 4a — Resume tailor
 # ─────────────────────────────────────────────────────────────────────────────
 
+# The model keeps appending a closing meta-note describing how it tailored the
+# resume (e.g. "This resume has been tailored to align with...") despite being
+# told not to.  Strip it deterministically so it never reaches the document.
+# Conservative: only a TRAILING block that *opens* with such a phrasing AND
+# mentions tailoring is removed, so real resume content is never touched.
+_NOTE_OPENING = re.compile(
+    r"(?:note[:\-\s]+)?(?:"
+    r"(?:this|the above|the following)\s+(?:tailored\s+)?"
+    r"(?:resume|cv|version|document|draft)"
+    r"|i(?:'ve|\s+have)?\s+tailored"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _strip_tailoring_note(text: str) -> str:
+    """Remove a trailing LLM meta-commentary paragraph about the tailoring."""
+    blocks = re.split(r"\n\s*\n", text.rstrip())
+    while blocks:
+        last = blocks[-1].strip()
+        # drop a trailing horizontal rule left dangling above/around the note
+        if re.fullmatch(r"[-*_]{3,}", last):
+            blocks.pop()
+            continue
+        flat = re.sub(r"^[\s>#*_\-]+", "", last)  # ignore leading md markers
+        if (_NOTE_OPENING.match(flat)
+                and re.search(r"\btailor", flat, re.IGNORECASE)
+                and len(flat) < 700):
+            blocks.pop()
+            continue
+        break
+    return "\n\n".join(blocks).rstrip() + "\n"
+
+
 def tailor_resume(state: AgentState) -> dict:
     """
     Rewrites the candidate's resume to match the JD — no fabrication.
@@ -258,7 +292,11 @@ def tailor_resume(state: AgentState) -> dict:
             "The tokens will be replaced with real contact details after your response.\n"
             "8. If a previous draft is provided, revise THAT draft to address the "
             "feedback rather than starting from scratch — keep everything the "
-            "feedback does not ask you to change."
+            "feedback does not ask you to change.\n"
+            "9. Output ONLY the resume itself. Do NOT add any closing note, "
+            "disclaimer, or meta-commentary about how the resume was tailored "
+            "(e.g. 'This resume has been tailored to align with...'). End the "
+            "output with the last real resume section."
         )),
         HumanMessage(content=(
             f"## Original Resume\n{sanitized}\n\n"
@@ -271,7 +309,9 @@ def tailor_resume(state: AgentState) -> dict:
         ))
     ])
 
-    final_resume = strip_stray_pii_tokens(restore_pii(response.content, mapping))
+    final_resume = _strip_tailoring_note(
+        strip_stray_pii_tokens(restore_pii(response.content, mapping))
+    )
 
     return {
         "tailored_resume": final_resume,

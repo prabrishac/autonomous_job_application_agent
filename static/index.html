@@ -663,7 +663,7 @@
             <div class="card-subtitle">Rewritten to match this role</div>
           </div>
           <button class="copy-btn" onclick="copyDoc('resumeDoc', this)" title="Copy to clipboard">Copy</button>
-          <button class="export-btn" id="exportResumeBtn" onclick="exportPDF('resumeDoc', 'Tailored Resume', 'tailored_resume.pdf', this)" title="Export as PDF" disabled>&#8595; PDF</button>
+          <button class="export-btn" id="exportResumeBtn" onclick="exportPDF('resumeDoc', 'Tailored Resume', 'tailored_resume.pdf', this, '')" title="Export as PDF" disabled>&#8595; PDF</button>
         </div>
         <div class="card-doc">
           <pre class="doc-pre" id="resumeDoc"><span class="placeholder-text">Waiting for generation…</span></pre>
@@ -733,7 +733,7 @@
 
     <!-- Completed strip (shown after approval) -->
     <div class="approve-strip hidden" id="completedStrip">
-      <p>✅ Documents approved and finalized. You can copy them from the cards above.</p>
+      <p>✅ Documents approved and finalized. You can copy or download them from the cards above.</p>
       <button class="btn btn-primary btn-sm" onclick="resetForm()">Start a New Application</button>
     </div>
 
@@ -1335,7 +1335,7 @@
   }
 
   /* ── Export as PDF ──────────────────────────────────────────────────────── */
-  async function exportPDF(docId, title, filename, btn) {
+  async function exportPDF(docId, title, filename, btn, pdfTitle = title) {
     const content = document.getElementById(docId).textContent.trim();
     if (!content || content.startsWith('Waiting for') || content.startsWith('Not yet')) {
       toast('Document not yet generated.', 'err');
@@ -1350,7 +1350,7 @@
       const res = await fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, filename }),
+        body: JSON.stringify({ title: pdfTitle, content, filename }),
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
