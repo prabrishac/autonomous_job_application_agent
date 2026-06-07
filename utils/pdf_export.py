@@ -176,9 +176,19 @@ def _to_latin1(text: str) -> str:
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
+def _section_separator(pdf: FPDF) -> None:
+    """Draw a full-width rule that visually closes off the previous section."""
+    pdf.ln(3)
+    pdf.set_draw_color(*_GRAY_300)
+    pdf.set_line_width(0.3)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
+    pdf.ln(4)
+
+
 def _render_markdown(pdf: FPDF, content: str) -> None:
     lm = pdf.l_margin
     indent = 6  # mm indent for list items
+    seen_section = False  # have we rendered a section (H2) yet?
 
     for raw_line in content.split("\n"):
         line    = raw_line.rstrip()
@@ -201,6 +211,11 @@ def _render_markdown(pdf: FPDF, content: str) -> None:
         # ── H2 ────────────────────────────────────────────────────────────
         elif re.match(r"^## [^#]", stripped):
             text = _to_latin1(_strip_inline(stripped[3:]))
+            # Close off the previous section with a separator (not before the
+            # first one, where it would sit awkwardly under the title).
+            if seen_section:
+                _section_separator(pdf)
+            seen_section = True
             pdf.ln(2)
             pdf.set_font(_FONT, "B", 12)
             pdf.set_text_color(*_INDIGO)

@@ -987,7 +987,16 @@
         break;
 
       case 'awaiting_feedback':
-        markDone('aggregate_outputs');
+        // Paused at the human-review interrupt: every node up to it has
+        // completed, so mark them done — this clears any spinner left from a
+        // reset-for-rerun, including the irrelevant-feedback case where the
+        // reset generation node never re-ran. human_review + classify_feedback
+        // stay idle so 'Review' renders as the active/waiting step.
+        NODES.forEach(n => {
+          stepStates[n.id] =
+            (n.id === 'human_review' || n.id === 'classify_feedback') ? 'idle' : 'done';
+        });
+        renderSteps();
         showOutputSection(ev.state);
         enableFeedback(true);
         applyApprovalLocks();   // keep previously-approved cards locked

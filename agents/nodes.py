@@ -553,6 +553,56 @@ _APPROVAL_KEYWORDS = frozenset(
     ["approve", "approved", "ok", "looks good", "yes", "lgtm", "ship it", "y", "done"]
 )
 
+
+def _classify_feedback_text(feedback: str) -> str:
+    """
+    Classify a free-form feedback string into 'approve' | 'actionable' | 'irrelevant'.
+
+    Used by BOTH the per-document (UI) path and the free-form (CLI) path so that
+    irrelevant text — including coherent but off-topic requests like
+    'write python code to add 2 numbers' — is rejected regardless of where it
+    was entered. Returns 'irrelevant' for anything too short or unrecognised.
+    """
+    feedback = (feedback or "").strip()
+
+    if feedback.lower() in _APPROVAL_KEYWORDS:
+        return "approve"
+
+    if len(feedback) < 8:
+        return "irrelevant"
+
+    llm = get_llm(temperature=0)
+    response = llm.invoke([
+        SystemMessage(content=(
+            "You are a feedback classifier for a job application assistant.\n"
+            "The assistant produces a tailored resume, cover letter, and interview prep guide.\n\n"
+            "Classify the user's feedback into exactly one of these categories:\n"
+            "  approve    — user is satisfied and wants to finish "
+            "(e.g. 'looks good', 'all good', 'perfect', 'send it')\n"
+            "  actionable — feedback gives specific instructions for improving "
+            "THESE THREE DOCUMENTS (the resume, cover letter, or interview prep) "
+            "(e.g. 'add more Python keywords', 'shorten the cover letter', "
+            "'focus on leadership experience')\n"
+            "  irrelevant — feedback is gibberish, random characters, too vague to act on, "
+            "OR is off-topic / unrelated to improving the resume, cover letter, or interview prep — "
+            "even if it is a clear, well-formed instruction. This includes general requests, "
+            "coding tasks, questions, or commands that have nothing to do with the documents "
+            "(e.g. 'asdf', 'I don't know', 'whatever', 'hello', "
+            "'write python code to add 2 numbers', 'what's the weather', 'tell me a joke')\n\n"
+            "The KEY test for actionable: the feedback must be about changing the resume, "
+            "cover letter, or interview prep. If it asks the assistant to do anything else, "
+            "it is irrelevant.\n\n"
+            "Reply with ONLY one word: approve, actionable, or irrelevant."
+        )),
+        HumanMessage(content=f"User feedback: {feedback}")
+    ])
+
+    classification = response.content.strip().lower()
+    if classification not in ("approve", "actionable", "irrelevant"):
+        classification = "irrelevant"
+    return classification
+
+
 def classify_feedback(state: AgentState) -> dict:
     """
     Decide what happens after human review and set feedback_type in state.
@@ -578,65 +628,49 @@ def classify_feedback(state: AgentState) -> dict:
         }
 
     # ── 2. Targeted per-document feedback from the UI ─────────────────────────
-    targeted = [
-        name for name, fb in (
-            ("resume",         state.get("resume_feedback", "").strip()),
-            ("cover letter",   state.get("cover_letter_feedback", "").strip()),
-            ("interview prep", state.get("interview_feedback", "").strip()),
-        ) if fb
-    ]
+    # Each non-empty field is relevance-checked individually; irrelevant text
+    # (e.g. 'write python code to add 2 numbers') is cleared so it can't trigger
+    # a wasted regeneration of that document.
+    doc_fields = (
+        ("resume",         "resume_feedback"),
+        ("cover letter",   "cover_letter_feedback"),
+        ("interview prep", "interview_feedback"),
+    )
+    targeted, rejected, cleared = [], [], {}
+    for name, field in doc_fields:
+        fb = state.get(field, "").strip()
+        if not fb:
+            continue
+        if _classify_feedback_text(fb) == "actionable":
+            targeted.append(name)
+        else:
+            rejected.append(name)
+            cleared[field] = ""   # drop irrelevant per-document feedback
+
     if targeted:
-        return {
+        result = {
             "feedback_type": "actionable",
             "revision_count": state.get("revision_count", 0) + 1,
             "messages": [f"✏️  Actionable feedback — regenerating: {', '.join(targeted)}."],
+            **cleared,
+        }
+        return result
+
+    if rejected:
+        # Per-document feedback was supplied but none of it was actionable.
+        return {
+            "feedback_type": "irrelevant",
+            "messages": [
+                f"⚠️  Feedback for {', '.join(rejected)} doesn't seem related to improving "
+                "the documents. Please give specific improvement instructions "
+                "or approve to finish."
+            ],
+            **cleared,
         }
 
     # ── 3. Free-form feedback (CLI) ───────────────────────────────────────────
     feedback = state.get("human_feedback", "").strip()
-
-    # ── Fast path: explicit approval keyword ──────────────────────────────────
-    if feedback.lower() in _APPROVAL_KEYWORDS:
-        return {
-            "feedback_type": "approve",
-            "messages": ["✅ Feedback classified as approval."],
-        }
-
-    # ── Fast path: empty or too short to be useful ────────────────────────────
-    if len(feedback) < 8:
-        return {
-            "feedback_type": "irrelevant",
-            "messages": [
-                f"⚠️  Feedback '{feedback}' is too short to act on. "
-                "Please describe what to improve (e.g. 'make the summary shorter') "
-                "or type 'approve' to finish."
-            ],
-        }
-
-    # ── LLM classification ────────────────────────────────────────────────────
-    llm = get_llm(temperature=0)
-    response = llm.invoke([
-        SystemMessage(content=(
-            "You are a feedback classifier for a job application assistant.\n"
-            "The assistant produces a tailored resume, cover letter, and interview prep guide.\n\n"
-            "Classify the user's feedback into exactly one of these categories:\n"
-            "  approve    — user is satisfied and wants to finish "
-            "(e.g. 'looks good', 'all good', 'perfect', 'send it')\n"
-            "  actionable — feedback contains specific, usable instructions for improving "
-            "the resume, cover letter, or interview prep "
-            "(e.g. 'add more Python keywords', 'shorten the cover letter', "
-            "'focus on leadership experience')\n"
-            "  irrelevant — feedback is gibberish, random characters, off-topic, "
-            "or too vague to act on "
-            "(e.g. 'asdf', 'I don't know', 'whatever', 'hello', general questions)\n\n"
-            "Reply with ONLY one word: approve, actionable, or irrelevant."
-        )),
-        HumanMessage(content=f"User feedback: {feedback}")
-    ])
-
-    classification = response.content.strip().lower()
-    if classification not in ("approve", "actionable", "irrelevant"):
-        classification = "irrelevant"
+    classification = _classify_feedback_text(feedback)
 
     if classification == "approve":
         return {
