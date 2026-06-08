@@ -11,6 +11,7 @@ Node execution order (see graph.py):
 """
 
 import json
+import os
 import re
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -81,11 +82,16 @@ def pii_guardrail(state: AgentState) -> dict:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared LLM instance
+# The model is configurable via the LLM_MODEL env var (set it in .env).
 # Use gpt-4o for best results; gpt-4o-mini works fine for cheaper runs.
 # ─────────────────────────────────────────────────────────────────────────────
 
+DEFAULT_LLM_MODEL = "gpt-5.4-mini"
+
+
 def get_llm(temperature: float = 0.3):
-    return ChatOpenAI(model="gpt-5.4-mini", temperature=temperature)
+    model = os.environ.get("LLM_MODEL", DEFAULT_LLM_MODEL)
+    return ChatOpenAI(model=model, temperature=temperature)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

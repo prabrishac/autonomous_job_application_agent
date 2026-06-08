@@ -19,7 +19,11 @@
       "Bash(pip3 list *)",
       "Bash(pip3 install *)",
       "Bash(python3 gen_system_design.py)",
-      "Bash(find /System/Library/Fonts /Library/Fonts ~/Library/Fonts -iname \"*georgia*\" -o -iname \"*book antiqua*\" -o -iname \"*palatino*\" -o -iname \"*arial*\" 2>/dev/null | sort)"
+      "Bash(find /System/Library/Fonts /Library/Fonts ~/Library/Fonts -iname \"*georgia*\" -o -iname \"*book antiqua*\" -o -iname \"*palatino*\" -o -iname \"*arial*\" 2>/dev/null | sort)",
+      "Bash(cd /Users/prabrisha/agentic_ai/aiengg/capstone_project/autonomous_job_application_agent)",
+      "Bash(find . -iname \"PROBLEM_DATA_EVALUATION.md\")",
+      "Bash(ls docs/)",
+      "Bash(python3 gen_problem_doc.py)"
     ]
   }
 }
