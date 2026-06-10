@@ -1,5 +1,5 @@
 # Autonomous Job Application Agent
-### Agentic AI Capstone Project — LangGraph + GPT-4o + FastAPI
+### Agentic AI Capstone Project — LangGraph + FastAPI
 
 ## What it does
 
