@@ -66,3 +66,40 @@ def test_cover_letter_quality(ex):
     out = _load(ex.name)
     tc = M.cover_letter_test_case(ex.job_description, out.get("cover_letter", ""))
     assert_test(tc, [M.cover_letter_quality_metric()])
+
+
+@pytest.mark.parametrize("ex", GOLDEN_EXAMPLES, ids=lambda e: e.name)
+def test_node_latency(ex):
+    """
+    Gate per-node latency recorded at the last fixture refresh. This reads the
+    stored `_node_latency` (latency "as of last refresh"), not a live timing, so
+    it stays deterministic in CI. Skips for fixtures generated before latency was
+    captured. Tune the budget with EVAL_MAX_NODE_LATENCY_S.
+    """
+    out = _load(ex.name)
+    per_node = out.get("_node_latency")
+    if not per_node:
+        pytest.skip("No latency recorded for this fixture. Run evaluate.py --refresh.")
+    slow = M.check_node_latency(per_node)
+    assert not slow, (
+        f"Node(s) over {M.node_latency_budget():.0f}s budget: "
+        + ", ".join(f"{n}={s:.1f}s" for n, s in slow)
+    )
+
+
+@pytest.mark.parametrize("ex", GOLDEN_EXAMPLES, ids=lambda e: e.name)
+def test_cost(ex):
+    """
+    Gate the agent's token usage recorded at the last fixture refresh. Primary
+    gate is on TOKENS (exact); the $ gate is only enforced when EVAL_MAX_COST_USD
+    is set, since the configured model's price isn't known here. Skips fixtures
+    generated before usage was captured. Tune with EVAL_MAX_TOKENS.
+    """
+    out = _load(ex.name)
+    tokens = out.get("_tokens")
+    if not tokens:
+        pytest.skip("No token usage recorded for this fixture. Run evaluate.py --refresh.")
+    over_tokens = M.check_token_budget(tokens)
+    assert not over_tokens, f"Run used {over_tokens} tokens > {M.token_budget()} budget."
+    over_cost = M.check_cost_budget(tokens)
+    assert not over_cost, f"Run cost ~${over_cost:.4f} > ${M.cost_budget_usd():.4f} budget."

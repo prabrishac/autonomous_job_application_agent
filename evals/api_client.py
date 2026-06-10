@@ -54,6 +54,37 @@ def _latest_state(events: list[dict]) -> dict | None:
     return None
 
 
+def node_latencies(events: list[dict]) -> tuple[float, dict[str, float]]:
+    """
+    Derive per-node latency (seconds) from server-stamped events, up to the first
+    human-review interrupt.
+
+    Each `node_complete` event's duration is the gap since the previous event's
+    server timestamp (`t`), so a node's time ≈ wall-clock from when the prior node
+    finished to when it finished — including its web search / LLM calls.
+
+    Returns (total_seconds, {node_name: seconds}). Both are 0 / empty if events
+    are unstamped (older server without the `_push` timestamp).
+    """
+    per_node: dict[str, float] = {}
+    prev_t = first_t = last_t = None
+    for ev in events:
+        t = ev.get("t")
+        if t is None:
+            continue
+        if first_t is None:
+            first_t = t
+        last_t = t
+        if ev.get("type") == "node_complete" and prev_t is not None:
+            node = ev.get("node", "?")
+            per_node[node] = round(per_node.get(node, 0.0) + (t - prev_t), 3)
+        prev_t = t
+        if ev.get("type") in ("awaiting_feedback", "completed"):
+            break  # measure only the initial run, where outputs are captured
+    total = round(last_t - first_t, 3) if first_t is not None and last_t is not None else 0.0
+    return total, per_node
+
+
 def generate_via_api(job_description: str, resume_text: str, *, approve: bool = True) -> dict:
     """
     Submit one (JD, resume) pair through the API and return the generated outputs.
@@ -106,8 +137,83 @@ def generate_via_api(job_description: str, resume_text: str, *, approve: bool = 
         if not outputs:
             raise RuntimeError("Reached review but no output state was captured.")
 
+        # Attach latency so it lands in the cached fixture alongside the outputs.
+        total_s, per_node = node_latencies(events)
+        outputs = {**outputs, "_latency_s": total_s, "_node_latency": per_node}
+
         # Approve to let the background thread finish and free the session.
         if approve and status == "awaiting_feedback":
             client.post(f"/api/feedback/{session_id}", json={"approve": True})
 
         return outputs
+
+
+def run_via_api(job_description: str, resume_text: str) -> dict:
+    """
+    Like generate_via_api, but for ERROR-HANDLING evals: never raises on an
+    expected failure — it classifies the outcome and returns it for assertion.
+
+    Returns a dict:
+        {
+          "outcome":  "success" | "error" | "reject_400" | "timeout",
+          "message":  str,            # error/rejection text ("" on success)
+          "outputs":  dict | None,    # generated payload on success, else None
+        }
+
+    Unexpected transport/exception conditions still propagate, so a genuine bug
+    in the harness or app surfaces loudly rather than masquerading as a graded
+    failure mode.
+    """
+    with _client() as client:
+        resp = client.post(
+            "/api/submit",
+            json={"job_description": job_description, "resume_text": resume_text},
+        )
+        # Input validation rejects malformed submissions before any run starts.
+        if resp.status_code == 400:
+            return {"outcome": "reject_400", "message": _detail(resp), "outputs": None}
+        if resp.status_code != 200:
+            return {"outcome": "reject_400", "message": _detail(resp), "outputs": None}
+
+        session_id = resp.json()["session_id"]
+        cursor = 0
+        events: list[dict] = []
+        deadline = time.time() + _POLL_TIMEOUT_S
+        status = "running"
+
+        while time.time() < deadline:
+            data = client.get(f"/api/status/{session_id}", params={"cursor": cursor}).json()
+            status = data["status"]
+            events.extend(data.get("events", []))
+            cursor = data.get("cursor", cursor)
+
+            if status == "error":
+                msg = next(
+                    (e.get("message") for e in reversed(events) if e.get("type") == "error"),
+                    "unknown error",
+                )
+                return {"outcome": "error", "message": msg, "outputs": None}
+
+            if status in ("awaiting_feedback", "completed"):
+                outputs = _latest_state(events)
+                if status == "awaiting_feedback":
+                    client.post(f"/api/feedback/{session_id}", json={"approve": True})
+                return {"outcome": "success", "message": "", "outputs": outputs}
+
+            time.sleep(_POLL_INTERVAL_S)
+
+        return {
+            "outcome": "timeout",
+            "message": f"No terminal status within {_POLL_TIMEOUT_S}s (last={status}).",
+            "outputs": None,
+        }
+
+
+def _detail(resp) -> str:
+    """Best-effort extraction of a FastAPI error 'detail' string from a response."""
+    try:
+        body = resp.json()
+    except Exception:
+        return resp.text
+    detail = body.get("detail", body) if isinstance(body, dict) else body
+    return detail if isinstance(detail, str) else str(detail)

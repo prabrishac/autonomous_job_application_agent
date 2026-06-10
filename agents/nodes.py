@@ -258,7 +258,10 @@ def tailor_resume(state: AgentState) -> dict:
     if not resume_fb and existing:
         return {"messages": ["📄 Resume unchanged (no specific feedback)."]}
 
-    llm = get_llm(temperature=0.4)
+    # Low temperature: tailoring must reframe existing facts, not invent new ones.
+    # Higher temperatures correlate with the model padding bullets with JD keywords
+    # the resume doesn't support, which the No-Fabrication eval penalises.
+    llm = get_llm(temperature=0.15)
 
     feedback = resume_fb or state.get("human_feedback", "")
     feedback_section = (
@@ -286,20 +289,33 @@ def tailor_resume(state: AgentState) -> dict:
             "Rewrite the candidate's resume to be a strong match for the target role "
             "without inventing any experience.\n"
             "Rules:\n"
-            "1. Mirror exact ATS keywords from the JD naturally.\n"
-            "2. Rewrite bullet points to highlight relevant impact.\n"
-            "3. Rewrite the summary/objective for this role.\n"
-            "4. Do NOT fabricate experience, companies, or skills.\n"
-            "5. Output in clean markdown. Do NOT wrap the response in a code fence (no ```).\n"
-            "6. Preserve all real experience — only reframe it.\n"
-            "7. The resume text may contain tokens like [PII:PHONE:abc12345]. "
+            "1. Use ONLY the JD keywords that the resume already demonstrates — "
+            "surface and lead with those. Do NOT introduce any skill, technology, "
+            "tool, domain, descriptive label, or responsibility the resume does not "
+            "explicitly support, even if the JD asks for it. When in doubt, prefer "
+            "the resume's own wording over JD phrasing.\n"
+            "2. Rewrite bullet points to highlight relevant impact, but every claim "
+            "must trace to a fact already in the original resume — rephrase facts, "
+            "never add them.\n"
+            "3. Rewrite the summary/objective for this role using only facts already "
+            "present in the resume.\n"
+            "4. Do NOT fabricate or embellish: no new employers, titles, dates, "
+            "metrics, team-size/scale claims, collaboration claims, or skills. Adding "
+            "descriptive characterisations not stated in the resume (e.g. "
+            "'high-throughput', 'distributed systems', 'production-grade') counts as "
+            "embellishment — avoid it unless that term already appears in the resume.\n"
+            "5. Do NOT add entries to the Skills section. Keep the original skills "
+            "list; you may reorder it to lead with the most relevant for this role.\n"
+            "6. Output in clean markdown. Do NOT wrap the response in a code fence (no ```).\n"
+            "7. Preserve all real experience — only reframe it.\n"
+            "8. The resume text may contain tokens like [PII:PHONE:abc12345]. "
             "Copy those tokens exactly as they appear — do NOT invent new [PII:*] tokens "
             "and do NOT use [PII:TYPE] shorthand without the hex ID. "
             "The tokens will be replaced with real contact details after your response.\n"
-            "8. If a previous draft is provided, revise THAT draft to address the "
+            "9. If a previous draft is provided, revise THAT draft to address the "
             "feedback rather than starting from scratch — keep everything the "
             "feedback does not ask you to change.\n"
-            "9. Output ONLY the resume itself. Do NOT add any closing note, "
+            "10. Output ONLY the resume itself. Do NOT add any closing note, "
             "disclaimer, or meta-commentary about how the resume was tailored "
             "(e.g. 'This resume has been tailored to align with...'). End the "
             "output with the last real resume section."
@@ -307,7 +323,7 @@ def tailor_resume(state: AgentState) -> dict:
         HumanMessage(content=(
             f"## Original Resume\n{sanitized}\n\n"
             f"## Job Description\n{state['job_description']}\n\n"
-            f"## Key Skills & Keywords to Include\n"
+            f"## JD Keywords — use ONLY those the resume already supports; ignore the rest\n"
             f"{json.dumps(state.get('jd_analysis', {}), indent=2)}\n\n"
             f"## Company Research\n{state.get('company_research', '')}"
             f"{previous_section}"

@@ -23,7 +23,22 @@
       "Bash(cd /Users/prabrisha/agentic_ai/aiengg/capstone_project/autonomous_job_application_agent)",
       "Bash(find . -iname \"PROBLEM_DATA_EVALUATION.md\")",
       "Bash(ls docs/)",
-      "Bash(python3 gen_problem_doc.py)"
+      "Bash(python3 gen_problem_doc.py)",
+      "Bash(.venv/bin/python -c \"from PIL import Image; im=Image.open\\('docs/flowchart.png'\\); print\\('size', im.size, 'mode', im.mode\\)\")",
+      "Bash(.venv/bin/python -c \"import struct,os; print\\('bytes', os.path.getsize\\('docs/flowchart.png'\\)\\)\")",
+      "Bash(.venv/bin/python -c \"import reportlab; print\\('reportlab', reportlab.Version\\)\")",
+      "Read(//System/Library/Fonts/Supplemental/**)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --no-pdf-header-footer --print-to-pdf=agent_job_application.pdf --no-margins file://__TRACKED_VAR__/design_doc.html)",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python -c \"import pypdf; r=pypdf.PdfReader\\('docs/agent_job_application.pdf'\\); print\\('PAGES:',len\\(r.pages\\)\\)\")",
+      "Read(//Users/prabrisha/Downloads/**)",
+      "Read(//Users/prabrisha/**)",
+      "Bash(cd /Users/prabrisha/agentic_ai/aiengg/capstone_project/autonomous_job_application_agent *)",
+      "Bash(.venv/bin/python -c \"from PIL import Image; im=Image.open\\('docs/flowchart.png'\\); print\\('flowchart', im.size, 'ratio', round\\(im.size[1]/im.size[0],4\\)\\)\")",
+      "Bash(.venv/bin/python -c \"import pypdf; r=pypdf.PdfReader\\('docs/agent_job_application.pdf'\\); print\\('PAGES:',len\\(r.pages\\),'| size',round\\(__import__\\('os'\\).path.getsize\\('docs/agent_job_application.pdf'\\)/1024\\),'KB'\\)\")",
+      "Bash(.venv/bin/python -c \"import pypdf; r=pypdf.PdfReader\\('docs/problem_data_evaluation.pdf'\\); print\\('PAGES:',len\\(r.pages\\)\\)\")",
+      "Bash(.venv/bin/python -c \"import matplotlib, os; p=os.path.join\\(matplotlib.get_data_path\\(\\),'fonts','ttf','DejaVuSans.ttf'\\); print\\('matplotlib DejaVu:', p, os.path.exists\\(p\\)\\)\")",
+      "Bash(.venv/bin/python -c \"import pypdf; print\\('PAGES:', len\\(pypdf.PdfReader\\('docs/problem_data_evaluation.pdf'\\).pages\\)\\)\")"
     ]
   }
 }

@@ -19,6 +19,15 @@ class Example:
     name: str            # short slug, also the fixture filename
     job_description: str
     resume_text: str
+    # Expected outcome of submitting this (JD, resume) through the API.
+    #   "success"     → run reaches the human-review interrupt with outputs
+    #   "error"       → run starts but the background agent halts (status=error)
+    #   "reject_400"  → POST /api/submit rejects the payload outright (HTTP 400)
+    expect: str = "success"
+    # Substring the error/rejection message MUST contain (case-insensitive).
+    expect_message_contains: str = ""
+    # A raw value that must NOT appear in any surfaced message/event (leak guard).
+    must_not_leak: str = ""
 
 
 GOLDEN_EXAMPLES: list[Example] = [
@@ -87,3 +96,55 @@ GOLDEN_EXAMPLES: list[Example] = [
         ),
     ),
 ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Adversarial / negative-path inputs.
+#
+# These grade the agent's ERROR HANDLING rather than output quality: given a
+# malformed or unsafe submission, does the agent fail *correctly* — right
+# outcome, right message, no data leak — instead of crashing, hanging, or
+# silently fabricating?
+#
+# All cases below short-circuit BEFORE any LLM call (input validation at
+# /api/submit, or the NODE 0 PII guardrail), so they run with no judge model
+# and incur no OpenAI billing — safe for the always-on CI gate.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# A minimal valid JD reused across cases that only vary the resume.
+_JD_BACKEND = GOLDEN_EXAMPLES[0].job_description
+_RESUME_CLEAN = (
+    "Priya Sharma\n"
+    "Backend engineer with 5 years building Python services.\n"
+    "Skills: Python, FastAPI, PostgreSQL, Kafka\n"
+)
+
+ADVERSARIAL_EXAMPLES: list[Example] = [
+    # Sensitive PII (SSN) must halt the run before anything reaches the LLM,
+    # report a clear reason, and never echo the raw value back.
+    Example(
+        name="ssn_in_resume",
+        job_description=_JD_BACKEND,
+        resume_text=_RESUME_CLEAN + "SSN: 123-45-6789\n",
+        expect="error",
+        expect_message_contains="Sensitive PII",
+        must_not_leak="123-45-6789",
+    ),
+    # Empty / whitespace-only inputs must be rejected at the door (HTTP 400),
+    # not started as a doomed background run.
+    Example(
+        name="empty_resume",
+        job_description=_JD_BACKEND,
+        resume_text="   ",
+        expect="reject_400",
+        expect_message_contains="Resume text is required",
+    ),
+    Example(
+        name="empty_jd",
+        job_description="",
+        resume_text=_RESUME_CLEAN,
+        expect="reject_400",
+        expect_message_contains="Job description is required",
+    ),
+]
+

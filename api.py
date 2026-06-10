@@ -8,6 +8,7 @@ Run from the project root directory:
 
 import os
 import sys
+import time
 import uuid
 import threading
 import traceback
@@ -22,6 +23,8 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from langchain_core.callbacks import BaseCallbackHandler
 
 from graph import build_graph
 from state import AgentState
@@ -67,7 +70,61 @@ class ExportPDFRequest(BaseModel):
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+class UsageTracker(BaseCallbackHandler):
+    """
+    Accumulates token usage across every LLM call in a graph run, attributing
+    each call to its LangGraph node. Attach via config["callbacks"]; LangGraph
+    propagates it to all nested LLM calls and tags each with `langgraph_node`.
+
+    Token counts are exact; converting to dollars is the eval's job (the price
+    of the configured model is not known here).
+    """
+
+    def __init__(self) -> None:
+        self.total = {"input": 0, "output": 0}
+        self.per_node: dict[str, dict[str, int]] = {}
+        self._run_node: dict[str, str] = {}  # run_id → node, set at start
+
+    def on_chat_model_start(self, serialized, messages, *, run_id, metadata=None, **kwargs):
+        # Chat models fire on_chat_model_start (not on_llm_start); capture the node here.
+        self._run_node[str(run_id)] = (metadata or {}).get("langgraph_node", "?")
+
+    def on_llm_end(self, response, *, run_id, **kwargs):
+        node = self._run_node.pop(str(run_id), "?")
+        inp, out = _extract_token_usage(response)
+        self.total["input"] += inp
+        self.total["output"] += out
+        bucket = self.per_node.setdefault(node, {"input": 0, "output": 0})
+        bucket["input"] += inp
+        bucket["output"] += out
+
+    def summary(self) -> dict:
+        total = {**self.total, "total": self.total["input"] + self.total["output"]}
+        return {"_tokens": total, "_node_tokens": self.per_node}
+
+
+def _extract_token_usage(response) -> tuple[int, int]:
+    """(input_tokens, output_tokens) from an LLMResult — robust across shapes."""
+    out = getattr(response, "llm_output", None) or {}
+    tu = out.get("token_usage") or out.get("usage") or {}
+    inp = tu.get("prompt_tokens") or tu.get("input_tokens") or 0
+    comp = tu.get("completion_tokens") or tu.get("output_tokens") or 0
+    if inp or comp:
+        return inp, comp
+    # Fallback: sum usage_metadata carried on each generation's message.
+    for gen_list in getattr(response, "generations", []) or []:
+        for gen in gen_list:
+            um = getattr(getattr(gen, "message", None), "usage_metadata", None) or {}
+            inp += um.get("input_tokens", 0)
+            comp += um.get("output_tokens", 0)
+    return inp, comp
+
+
 def _push(session: dict, event: dict) -> None:
+    # Stamp a monotonic server-side clock on every event so evals can derive
+    # per-node latency from the gaps between consecutive events. perf_counter()
+    # has an arbitrary origin — only differences within one run are meaningful.
+    event.setdefault("t", time.perf_counter())
     session["events"].append(event)
 
 
@@ -99,7 +156,8 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
             raise RuntimeError("OPENAI_API_KEY is not set. Add it to the .env file.")
 
         graph = build_graph()
-        config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+        usage = UsageTracker()
+        config = {"configurable": {"thread_id": str(uuid.uuid4())}, "callbacks": [usage]}
 
         initial_state: AgentState = {
             "job_description": jd,
@@ -148,7 +206,8 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
             score = snapshot.get("quality_score", 0.0)
             rev = snapshot.get("revision_count", 0)
             print(f"[{session_id[:8]}] ⏸  awaiting feedback (score={score:.2f}, revision={rev})")
-            _push(session, {"type": "awaiting_feedback", "state": _output_payload(snapshot)})
+            _push(session, {"type": "awaiting_feedback",
+                            "state": {**_output_payload(snapshot), **usage.summary()}})
             session["status"] = "awaiting_feedback"
 
             session["feedback_ready"].wait()
@@ -198,7 +257,8 @@ def _run_agent(session_id: str, jd: str, resume_text: str) -> None:
 
         # ── Completed ─────────────────────────────────────────────────────────
         print(f"[{session_id[:8]}] ✅ Completed — exporting documents")
-        _push(session, {"type": "completed", "state": _output_payload(snapshot)})
+        _push(session, {"type": "completed",
+                        "state": {**_output_payload(snapshot), **usage.summary()}})
         session["status"] = "completed"
 
     except PIIBlockedError as exc:

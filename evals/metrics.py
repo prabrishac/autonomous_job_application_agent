@@ -12,8 +12,11 @@ Each metric maps to one of the agent's explicit promises:
 `check_no_pii_tokens` is a cheap deterministic guard (no LLM): the final
 documents must never leak stray [PII:TYPE:id] tokens from the redaction layer.
 
-The GEval judge model is gpt-4o by default; override with EVAL_MODEL.
+By default the GEval judge tracks the agent's model (LLM_MODEL in .env, same as
+agents/nodes.py); set EVAL_MODEL to pin an independent judge.
 """
+
+from __future__ import annotations
 
 import os
 import re
@@ -22,8 +25,14 @@ from deepeval.metrics import GEval, FaithfulnessMetric
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 
 
+# Keep the fallback in sync with agents/nodes.py DEFAULT_LLM_MODEL.
+_DEFAULT_MODEL = "gpt-5.4-mini"
+
+
 def _judge_model() -> str:
-    return os.environ.get("EVAL_MODEL", "gpt-4o")
+    # EVAL_MODEL is an explicit judge override; otherwise track the agent's model
+    # (LLM_MODEL from .env), mirroring get_llm() in agents/nodes.py.
+    return os.environ.get("EVAL_MODEL") or os.environ.get("LLM_MODEL", _DEFAULT_MODEL)
 
 
 # ── LLM-as-judge metrics (GEval) ────────────────────────────────────────────────
@@ -163,6 +172,76 @@ def check_no_pii_tokens(*texts: str) -> list[str]:
         if t:
             leaks.extend(_PII_TOKEN.findall(t))
     return leaks
+
+
+# Per-node latency budget (seconds). A node slower than this fails the gate.
+# Generous by default — each node makes web-search / LLM calls whose latency
+# varies run-to-run, so a tight bound on a single sample would flake. Override
+# with EVAL_MAX_NODE_LATENCY_S for a stricter gate or faster hardware.
+def node_latency_budget() -> float:
+    return float(os.environ.get("EVAL_MAX_NODE_LATENCY_S", "60"))
+
+
+def check_node_latency(per_node: dict[str, float], budget_s: float | None = None) -> list[tuple[str, float]]:
+    """
+    Return [(node, seconds), ...] for any node exceeding the budget (sorted slowest
+    first). Empty list means every node is within budget — or no timing was
+    captured (older fixture), which the caller should treat as "skip", not "pass".
+    """
+    budget = node_latency_budget() if budget_s is None else budget_s
+    over = [(node, secs) for node, secs in (per_node or {}).items() if secs > budget]
+    return sorted(over, key=lambda x: x[1], reverse=True)
+
+
+# ── Cost (token-based) ───────────────────────────────────────────────────────────
+#
+# Token counts are exact; dollars depend on a price we can't infer for the
+# configured model (e.g. gpt-5.4-mini), so the rate is configurable and the
+# primary gate is on TOKENS. The $ gate only applies when EVAL_MAX_COST_USD is set.
+
+def token_budget() -> int:
+    """Max total tokens (input+output) for one run. Override with EVAL_MAX_TOKENS."""
+    return int(os.environ.get("EVAL_MAX_TOKENS", "80000"))
+
+
+def price_rates() -> tuple[float, float]:
+    """(input, output) price in USD per 1M tokens. Override with EVAL_PRICE_PER_1M_*."""
+    return (
+        float(os.environ.get("EVAL_PRICE_PER_1M_INPUT", "0.15")),
+        float(os.environ.get("EVAL_PRICE_PER_1M_OUTPUT", "0.60")),
+    )
+
+
+def estimate_cost_usd(tokens: dict[str, int]) -> float:
+    """Estimate run cost in USD from a {'input','output'} token dict and the rates."""
+    in_rate, out_rate = price_rates()
+    return round(
+        tokens.get("input", 0) / 1_000_000 * in_rate
+        + tokens.get("output", 0) / 1_000_000 * out_rate,
+        4,
+    )
+
+
+def check_token_budget(tokens: dict[str, int], budget: int | None = None) -> int:
+    """Return total tokens if over budget, else 0. (0 also when no tokens captured.)"""
+    total = tokens.get("total") or (tokens.get("input", 0) + tokens.get("output", 0))
+    cap = token_budget() if budget is None else budget
+    return total if total > cap else 0
+
+
+def cost_budget_usd() -> float | None:
+    """Optional $ ceiling. Returns None when EVAL_MAX_COST_USD is unset (no $ gate)."""
+    raw = os.environ.get("EVAL_MAX_COST_USD")
+    return float(raw) if raw else None
+
+
+def check_cost_budget(tokens: dict[str, int]) -> float:
+    """Return estimated $ if it exceeds EVAL_MAX_COST_USD, else 0 (0 when no $ gate)."""
+    cap = cost_budget_usd()
+    if cap is None:
+        return 0.0
+    cost = estimate_cost_usd(tokens)
+    return cost if cost > cap else 0.0
 
 
 # ── Test-case builders ──────────────────────────────────────────────────────────
